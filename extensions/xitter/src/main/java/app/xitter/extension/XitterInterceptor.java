@@ -53,6 +53,19 @@ final class XitterInterceptor implements Interceptor {
             java.util.List<String> segments = target.pathSegments();
             operation = segments.get(segments.size() - 1);
             String server = Operations.serverName(operation);
+            // followers and following: their page, and their timelines by id (Connections)
+            try {
+                if (Connections.isPage(operation)) {
+                    return log(request, target, json(request, 200, Connections.page(target.queryParameter("variables"))), "local");
+                }
+                String[] byId = Connections.timeline(operation, target.queryParameter("variables"));
+                if (byId != null) {
+                    server = byId[0];
+                    target = target.newBuilder().setQueryParameter("variables", byId[1]).build();
+                }
+            } catch (org.json.JSONException e) {
+                Log.w(XitterNetwork.TAG, "followers page", e);
+            }
             if (!server.equals(operation)) target = target.newBuilder().setPathSegment(segments.size() - 1, server).build();
             // and its variables, named as the web operation names them
             String vars = target.queryParameter("variables");
@@ -204,9 +217,10 @@ final class XitterInterceptor implements Interceptor {
         if (path.endsWith("/1.1/guest/activate.json")) {
             return empty(request, "{\"guest_token\":\"1\"}");
         }
-        // X's feature switches for the app; none set, so the app keeps its built-in defaults
+        // X's feature switches for the app: its built-in defaults, but for screens the classic
+        // app has an older version of that reads what the instance answers
         if (path.endsWith("/1.1/help/settings.json")) {
-            return empty(request, "{\"config\":{},\"impressions\":[]}");
+            return empty(request, "{\"config\":" + FEATURE_SWITCHES + ",\"impressions\":[]}");
         }
         if (path.endsWith("/GenerateAttestationNonce")) {
             return empty(request, "{\"data\":{\"generate_attestation_nonce\":{\"nonce\":\"eGl0dGVy\"}}}");
@@ -222,6 +236,11 @@ final class XitterInterceptor implements Interceptor {
         }
         return null;
     }
+
+    private static final String FEATURE_SWITCHES = "{"
+            // followers and following: the timeline screens (the new page is an Apollo query)
+            + "\"android_follower_timelines_stack_enabled\":{\"value\":false}"
+            + "}";
 
     private static boolean isTelemetry(String path) {
         return path.startsWith("/1.1/jot/") || path.startsWith("/i/jot") || path.contains("/scribe")

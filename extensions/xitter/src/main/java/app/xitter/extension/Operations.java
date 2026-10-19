@@ -56,6 +56,7 @@ final class Operations {
         op("UserWithProfileTweetsQueryV2", new Op("UserTweets", profileTimeline, androidProfileTimeline, "rest_id", "userId"));
         op("UserWithProfileTweetsAndRepliesQueryV2", new Op("UserTweetsAndReplies", profileTimeline, androidProfileTimeline, "rest_id", "userId"));
         op("MediaTimelineV2", new Op("UserMedia", profileTimeline, androidProfileTimeline, "rest_id", "userId"));
+        op("FavoritesByTimeTimelineV2", new Op("Likes", profileTimeline, androidProfileTimeline, "rest_id", "userId"));
         op("UserResultByIdQuery", new Op("UserByRestId", "user", "user_result", "rest_id", "userId"));
         op("UserResultByScreenNameQuery", new Op("UserByScreenName", "user", "user_result"));
     }
@@ -107,6 +108,15 @@ final class Operations {
     static JSONObject moveResult(String operation, JSONObject response) throws JSONException {
         Op op = OPS.get(operation);
         JSONObject data = response.optJSONObject("data");
+        // followers and following by id (Connections): an Apollo timeline of users
+        if ("TimelineByIdQuery".equals(operation) && data != null) {
+            JSONObject user = data.optJSONObject("user"), result = user == null ? null : user.optJSONObject("result");
+            JSONObject timeline = result == null ? null : result.optJSONObject("timeline");
+            if (timeline != null && timeline.has("timeline")) {
+                response.put("data", new JSONObject().put("timeline", ApolloTimelines.userTimeline("connections", timeline.getJSONObject("timeline"))));
+            }
+            return response;
+        }
         if (op == null || op.from == null || data == null) return response;
         Object result = data;
         for (String k : op.from) {
