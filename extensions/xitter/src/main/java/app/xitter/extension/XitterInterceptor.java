@@ -3,8 +3,6 @@ package app.xitter.extension;
 import android.util.Log;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
@@ -45,7 +43,7 @@ final class XitterInterceptor implements Interceptor {
         if (local != null) return log(request, url, local, "local");
 
         // what the instance reads: uncompressed bodies
-        request = Bodies.uncompressed(request);
+        request = withFormFields(Bodies.uncompressed(request), path);
         HttpUrl target = x ? HttpUrl.get(XitterNetwork.rewrite(url.toString())) : url;
         // the app's GraphQL operation, and the one the instance answers for it
         String operation = null;
@@ -142,8 +140,6 @@ final class XitterInterceptor implements Interceptor {
      * session the token stands for (its session cookie and csrf header).
      */
     static final class Auth implements Interceptor {
-        private static final Pattern OAUTH_TOKEN = Pattern.compile("oauth_token=\"([^\"]*)\"");
-
         @Override
         public Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
@@ -160,12 +156,7 @@ final class XitterInterceptor implements Interceptor {
             out.removeHeader("X-Guest-Token");
             out.removeHeader("Cookie");
             out.removeHeader("x-csrf-token");
-            String token = null;
-            if (authorization != null && authorization.startsWith("OAuth ")) {
-                Matcher m = OAUTH_TOKEN.matcher(authorization);
-                if (m.find()) token = m.group(1);
-            }
-            Session s = Session.fromOAuthToken(token);
+            Session s = Session.fromAuthorization(authorization);
             if (s != null) {
                 out.header("Cookie", "auth_token=" + s.authToken + "; ct0=" + s.csrf);
                 out.header("x-csrf-token", s.csrf);
@@ -174,6 +165,19 @@ final class XitterInterceptor implements Interceptor {
             String app = XitterConfig.clientToken();
             if (app != null && !app.trim().isEmpty()) out.header("Authorization", "Bearer " + app.trim());
         }
+    }
+
+    // form fields the app names otherwise than the web client: a password change's new password
+    private static Request withFormFields(Request request, String path) throws IOException {
+        okhttp3.RequestBody body = request.body();
+        if (body == null || !path.endsWith("/account/change_password.json")) return request;
+        String form = new String(Bodies.read(body), java.nio.charset.StandardCharsets.UTF_8);
+        StringBuilder out = new StringBuilder();
+        for (String field : form.split("&")) {
+            if (out.length() > 0) out.append('&');
+            out.append(field.startsWith("password=") ? "new_" + field : field);
+        }
+        return request.newBuilder().method(request.method(), okhttp3.RequestBody.create(out.toString(), body.contentType())).build();
     }
 
     // a POST's variables, in its JSON body

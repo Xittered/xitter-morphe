@@ -21,6 +21,15 @@ final class Session {
         return authToken + SEPARATOR + csrf;
     }
 
+    private static final java.util.regex.Pattern OAUTH_TOKEN = java.util.regex.Pattern.compile("oauth_token=\"([^\"]*)\"");
+
+    /** The session an OAuth Authorization header (as the app signs requests) carries, or null. */
+    static Session fromAuthorization(String authorization) {
+        if (authorization == null || !authorization.startsWith("OAuth ")) return null;
+        java.util.regex.Matcher m = OAUTH_TOKEN.matcher(authorization);
+        return m.find() ? fromOAuthToken(m.group(1)) : null;
+    }
+
     static Session fromOAuthToken(String token) {
         if (token == null) return null;
         int i = token.indexOf(SEPARATOR);

@@ -213,23 +213,139 @@ public final class XitterNetwork {
     }
 
     // ---- WebView ----
-    // X's pages aren't the instance's: a WebView would load the instance's own signed-out page
-    // (X's app loads x.com in a hidden WebView to set up web sign-in, and would then hand that
-    // page to the browser). X's addresses are not loaded at all; anything else allowed is.
+    // X's pages in the app's WebViews (settings pages, help) are the instance's web pages. The
+    // app opens them through x.com/account/authenticate_web_view?redirect_url=..., signed with
+    // the account's OAuth header: that hand-off is done here, with the session's cookies put in
+    // the WebView's cookie store for the instance. X's app signs its shared WebView in through
+    // a hidden preload page, answered here with an empty page (the instance's page there would
+    // be handed to the browser); Grok has no counterpart on the instance and isn't loaded.
 
-    private static String webViewTarget(String url) {
-        if (url == null) return null;
+    private static final String[] NO_WEBVIEW = {"/i/webview-preload", "/i/grok"};
+    private static final String PRELOAD = "https://x.com/i/webview-preload";
+
+    // the preload is waited for until a page finishes at its address: an empty page under that
+    // address, loaded from here, with nothing asked of X
+    private static boolean isPreload(String url) {
+        if (url == null) return false;
         try {
-            String host = URI.create(url.trim()).getHost();
-            if (host != null && isXHost(host)) return null;
-        } catch (IllegalArgumentException ignored) {
+            URI uri = URI.create(url.trim());
+            if (uri.getHost() == null || !isXHost(uri.getHost())) return false;
+            if ("/account/authenticate_web_view".equals(uri.getPath())) {
+                String redirect = android.net.Uri.parse(url.trim()).getQueryParameter("redirect_url");
+                if (redirect == null) return false;
+                uri = URI.create("https://x.com/").resolve(redirect);
+            }
+            return "/i/webview-preload".equals(uri.getPath());
+        } catch (IllegalArgumentException e) {
+            return false;
         }
-        return rewrite(url);
+    }
+
+    private static String webViewTarget(String url, Map<String, String> headers) {
+        if (url == null) return null;
+        // adb shell setprop log.tag.Xitter DEBUG also opens the app's WebViews to chrome://inspect
+        if (Log.isLoggable(TAG, Log.DEBUG)) android.webkit.WebView.setWebContentsDebuggingEnabled(true);
+        try {
+            URI uri = URI.create(url.trim());
+            String host = uri.getHost();
+            if (host == null || !isXHost(host)) return rewrite(url);
+            if ("/account/authenticate_web_view".equals(uri.getPath())) {
+                // the session goes to the WebView's cookies even when the page itself isn't loaded
+                if (headers != null) signIn(headers.get("Authorization"));
+                String redirect = android.net.Uri.parse(url.trim()).getQueryParameter("redirect_url");
+                if (redirect == null) return null;
+                URI to = URI.create("https://x.com/").resolve(redirect);
+                if (to.getHost() == null || !isXHost(to.getHost())) return null;
+                uri = to;
+            }
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            for (String p : NO_WEBVIEW) if (path.equals(p) || path.startsWith(p + "/")) return null;
+            String to = rewrite(uri.toString());
+            if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "web view " + url + " -> " + to);
+            return to;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** For the app's WebViewClients: a navigation (URL or request) to one of the instance's pages. */
+    public static boolean isInstancePage(Object navigation) {
+        Object url = navigation instanceof android.webkit.WebResourceRequest ? ((android.webkit.WebResourceRequest) navigation).getUrl() : navigation;
+        if (url == null) return false;
+        android.net.Uri uri = android.net.Uri.parse(url.toString());
+        String scheme = uri.getScheme();
+        return ("http".equals(scheme) || "https".equals(scheme)) && isInstanceHost(uri.getHost());
+    }
+
+    // the session's account id by session cookie: the web client also reads it from a cookie
+    private static final Map<String, String> ACCOUNT_IDS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static void signIn(String authorization) {
+        Session s = Session.fromAuthorization(authorization);
+        if (s == null) return;
+        setWebCookie("auth_token", s.authToken, true);
+        setWebCookie("ct0", s.csrf, false);
+        String id = ACCOUNT_IDS.get(s.authToken);
+        if (id != null) {
+            setWebCookie("twid", "u%3D" + id, false);
+        } else {
+            // the web client reloads its page until "twid" names the signed-in account
+            new Thread(() -> {
+                String found = accountId(s);
+                if (found == null) return;
+                ACCOUNT_IDS.put(s.authToken, found);
+                setWebCookie("twid", "u%3D" + found, false);
+            }, "XitterWebSignIn").start();
+        }
+        if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "web view signed in to " + instance().origin);
+    }
+
+    private static void setWebCookie(String name, String value, boolean httpOnly) {
+        android.webkit.CookieManager cookies = android.webkit.CookieManager.getInstance();
+        String secure = "https".equals(instance().scheme) ? "; Secure" : "";
+        cookies.setCookie(instance().origin, name + "=" + value + "; Path=/; Max-Age=31536000; SameSite=Lax" + (httpOnly ? "; HttpOnly" : "") + secure);
+        cookies.flush();
+    }
+
+    private static okhttp3.OkHttpClient webSignInClient;
+
+    // the session's account, from the instance's Viewer query (XitterInterceptor signs it)
+    private static String accountId(Session s) {
+        try {
+            synchronized (XitterNetwork.class) {
+                if (webSignInClient == null) webSignInClient = new okhttp3.OkHttpClient();
+            }
+            Instance i = instance();
+            okhttp3.Request r = new okhttp3.Request.Builder()
+                    .url(i.origin + i.base + "/graphql/xitter/Viewer?variables=%7B%7D&features=%7B%7D")
+                    .header("Authorization", "OAuth oauth_token=\"" + s.oauthToken() + "\"")
+                    .build();
+            try (okhttp3.Response response = webSignInClient.newCall(r).execute()) {
+                if (!response.isSuccessful() || response.body() == null) return null;
+                org.json.JSONObject result = new org.json.JSONObject(response.body().string()).getJSONObject("data")
+                        .getJSONObject("viewer").getJSONObject("user_results").getJSONObject("result");
+                String id = result.optString("rest_id");
+                return id.isEmpty() ? null : id;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "could not look up the web view's account", e);
+            return null;
+        }
+    }
+
+    // the app's own headers (its OAuth signature) are for X, not for a web page
+    private static Map<String, String> webViewHeaders(Map<String, String> headers) {
+        if (headers == null) return null;
+        Map<String, String> out = new java.util.HashMap<>(headers);
+        out.remove("Authorization");
+        return out;
     }
 
     public static void loadUrl(android.webkit.WebView view, String url) {
-        String to = webViewTarget(url);
-        if (to == null) {
+        String to = webViewTarget(url, null);
+        if (isPreload(url)) {
+            view.loadDataWithBaseURL(PRELOAD, "<html></html>", "text/html", "utf-8", null);
+        } else if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
         } else {
@@ -238,17 +354,19 @@ public final class XitterNetwork {
     }
 
     public static void loadUrl(android.webkit.WebView view, String url, Map<String, String> headers) {
-        String to = webViewTarget(url);
-        if (to == null) {
+        String to = webViewTarget(url, headers);
+        if (isPreload(url)) {
+            view.loadDataWithBaseURL(PRELOAD, "<html></html>", "text/html", "utf-8", null);
+        } else if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
         } else {
-            view.loadUrl(to, headers);
+            view.loadUrl(to, webViewHeaders(headers));
         }
     }
 
     public static void postUrl(android.webkit.WebView view, String url, byte[] body) {
-        String to = webViewTarget(url);
+        String to = webViewTarget(url, null);
         if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
@@ -261,7 +379,7 @@ public final class XitterNetwork {
 
     public static void startActivity(android.content.Context context, android.content.Intent intent) {
         android.content.Intent out = outbound(context, intent);
-        if (out != intent && Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "link " + intent.toUri(0) + " -> " + out.toUri(0));
+        if (out != intent && Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "link " + describe(intent) + " -> " + describe(out));
         context.startActivity(out);
     }
 
@@ -276,12 +394,23 @@ public final class XitterNetwork {
      * ("chooser") link is looked at too.
      */
     static android.content.Intent outbound(android.content.Context context, android.content.Intent intent) {
+        return outbound(context, intent, false);
+    }
+
+    private static android.content.Intent outbound(android.content.Context context, android.content.Intent intent, boolean elsewhere) {
         try {
             if (intent == null) return null;
             if (android.content.Intent.ACTION_CHOOSER.equals(intent.getAction())) {
                 android.content.Intent inner = intent.getParcelableExtra(android.content.Intent.EXTRA_INTENT);
                 if (inner == null) return intent;
-                android.content.Intent handled = outbound(context, inner);
+                // "open with another app" (the app excluded from the choice) stays that way
+                boolean excludesApp = false;
+                android.os.Parcelable[] excluded = intent.getParcelableArrayExtra(android.content.Intent.EXTRA_EXCLUDE_COMPONENTS);
+                for (int i = 0; excluded != null && i < excluded.length; i++) {
+                    if (excluded[i] instanceof android.content.ComponentName
+                            && context.getPackageName().equals(((android.content.ComponentName) excluded[i]).getPackageName())) excludesApp = true;
+                }
+                android.content.Intent handled = outbound(context, inner, excludesApp);
                 // one of the app's own screens: no need to ask which app
                 if (context.getPackageName().equals(handled.getPackage())) return handled;
                 intent.putExtra(android.content.Intent.EXTRA_INTENT, handled);
@@ -297,7 +426,7 @@ public final class XitterNetwork {
             boolean targeted = intent.getPackage() != null || intent.getComponent() != null;
             boolean toUs = own.equals(intent.getPackage()) || (intent.getComponent() != null && own.equals(intent.getComponent().getPackageName()));
             if (toUs) return intent;
-            if (!targeted) {
+            if (!targeted && !elsewhere) {
                 // the app's screens take x.com addresses; the instance's are the same paths
                 android.net.Uri asX = ours ? android.net.Uri.parse("https://x.com" + instancePath(data)) : data;
                 android.content.Intent inApp = new android.content.Intent(intent).setData(asX).setPackage(own);
@@ -311,6 +440,11 @@ public final class XitterNetwork {
             Log.w(TAG, "could not check an outgoing link", e);
         }
         return intent;
+    }
+
+    private static String describe(android.content.Intent intent) {
+        android.content.Intent inner = android.content.Intent.ACTION_CHOOSER.equals(intent.getAction()) ? intent.getParcelableExtra(android.content.Intent.EXTRA_INTENT) : null;
+        return intent.toUri(0) + (inner == null ? "" : " [" + inner.toUri(0) + "]");
     }
 
     // an instance address's path (and query) as X has it: without the path the instance lives under

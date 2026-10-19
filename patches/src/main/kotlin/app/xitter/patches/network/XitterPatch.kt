@@ -2,6 +2,8 @@ package app.xitter.patches.network
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
@@ -10,6 +12,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import app.morphe.patcher.util.smali.ExternalLabel
 import app.xitter.patches.shared.Constants.COMPATIBILITY_X
 import app.xitter.patches.shared.Constants.CONFIG_CLASS
 import app.xitter.patches.shared.Constants.EXTENSION_PACKAGE
@@ -314,6 +317,42 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
         }
     }
     println("Xitter: routed $count network calls in ${targets.size} classes through the Xitter guard")
+
+    // X's in-app web pages (settings pages) are the instance's (XitterNetwork.loadUrl), and the
+    // app's WebViewClients hand any page outside X's hosts to the browser, where the instance
+    // is signed out. A page of the instance's stays in the WebView.
+    val clients = mutableListOf<ClassDef>()
+    classDefForEach { c -> if (isSubclass(c.type, WEBVIEW_CLIENT) && c.methods.any { it.isUrlOverride() }) clients += c }
+    var kept = 0
+    for (c in clients) {
+        mutableClassDefBy(c).methods.filter { it.isUrlOverride() }.forEach {
+            it.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static {p2}, $NETWORK_CLASS->isInstancePage(Ljava/lang/Object;)Z
+                    move-result v0
+                    if-eqz v0, :original
+                    const/4 v0, 0x0
+                    return v0
+                """,
+                ExternalLabel("original", it.getInstruction(0)),
+            )
+            kept++
+        }
+    }
+    println("Xitter: instance pages stay in $kept web view clients")
+}
+
+private const val WEBVIEW_CLIENT = "Landroid/webkit/WebViewClient;"
+
+// shouldOverrideUrlLoading(WebView, String or WebResourceRequest), with a register to spare
+private fun Method.isUrlOverride(): Boolean {
+    if (name != "shouldOverrideUrlLoading" || returnType != "Z" || AccessFlags.ABSTRACT.isSet(accessFlags)) return false
+    val params = parameterTypes.map { it.toString() }
+    if (params.size != 2 || params[0] != "Landroid/webkit/WebView;") return false
+    if (params[1] != "Ljava/lang/String;" && params[1] != "Landroid/webkit/WebResourceRequest;") return false
+    val impl = implementation ?: return false
+    return impl.registerCount > 3
 }
 
 private fun Method.isVariantGetter() =

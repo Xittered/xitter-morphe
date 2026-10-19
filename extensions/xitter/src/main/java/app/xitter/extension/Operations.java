@@ -85,6 +85,11 @@ final class Operations {
         op("UserListMute", new Op("MuteList", null, null, "list_id", "listId"));
         op("UserListUnmute", new Op("UnmuteList", null, null, "list_id", "listId"));
 
+        // settings: blocked and muted accounts
+        op("ViewerBlockingTimelineQuery", new Op("BlockedAccountsAll", "viewer.timeline.timeline", "viewer.timeline_response.timeline"));
+        op("ViewerImportedBlockingTimelineQuery", new Op("BlockedAccountsImported", "viewer.timeline.timeline", "viewer.timeline_response.timeline"));
+        op("ViewerMutingTimelineQuery", new Op("MutedAccounts", "viewer.muting_timeline.timeline", "viewer.timeline_response.timeline"));
+
         // a post and its replies
         op("ConversationTimelineV2", new Op("TweetDetail", "threaded_conversation_with_injections_v2", "timeline_response"));
 
