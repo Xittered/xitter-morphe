@@ -1,3 +1,9 @@
+## [1.1.0-dev.8](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.7...v1.1.0-dev.8) (2026-10-19)
+
+### ✨ New Features
+
+* reposts, photo uploads, media links hidden ([3b760eb](https://github.com/Xittered/xitter-morphe/commit/3b760eb7267998dd3b4a3dacfe772b80f076aee4))
+
 ## [1.1.0-dev.7](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.6...v1.1.0-dev.7) (2026-10-19)
 
 ### ✨ New Features
