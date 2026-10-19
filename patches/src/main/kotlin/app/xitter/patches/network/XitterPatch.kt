@@ -18,10 +18,12 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc
 import com.android.tools.smali.dexlib2.iface.ClassDef
+import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction3rc
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.immutable.reference.ImmutableMethodReference
 import java.net.URI
 import java.util.logging.Logger
@@ -29,6 +31,7 @@ import org.w3c.dom.Element
 
 private const val OKHTTP_BUILDER = "Lokhttp3/OkHttpClient\$Builder;"
 private const val WEBVIEW = "Landroid/webkit/WebView;"
+
 
 /**
  * A platform method the app calls that the guard takes over: calls to it in the app are
@@ -159,7 +162,30 @@ val xitterPatch = bytecodePatch(
         } ?: throw PatchException("OkHttpClient(Builder) not found")
         clientConstructor.addInstruction(0, "invoke-static {p1}, $NETWORK_CLASS->onBuild($OKHTTP_BUILDER)V")
 
-        // 3. Everything else that opens connections or resolves hosts.
+        // 3. The native sign-in screens. Signed out, the app shows a Jetfuel (server-drawn) welcome
+        // screen unless a feature switch picks the classic splash, whose task.json flow the
+        // extension answers.
+        // getVariant() returns the (obfuscated) OnboardingVariant enum: JETFUEL unless
+        // "onboarding_new_killer_switch_enabled" is on; it now always returns DEFAULT
+        val variantProviders = mutableListOf<ClassDef>()
+        classDefForEach { c ->
+            if (c.methods.any { it.isVariantGetter() }) variantProviders += c
+        }
+        if (variantProviders.isEmpty()) throw PatchException("OnboardingVariant getVariant() not found")
+        for (c in variantProviders) {
+            mutableClassDefBy(c).methods.filter { it.isVariantGetter() }.forEach {
+                val variant = it.returnType
+                it.addInstructions(
+                    0,
+                    """
+                        sget-object v0, $variant->DEFAULT:$variant
+                        return-object v0
+                    """,
+                )
+            }
+        }
+
+        // 4. Everything else that opens connections or resolves hosts.
         redirectPlatformCalls()
     }
 }
@@ -236,6 +262,12 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
     }
     Logger.getLogger("Xitter").info("Routed $count network calls in ${targets.size} classes through the Xitter guard")
 }
+
+private fun Method.isVariantGetter() =
+    name == "getVariant" && parameterTypes.isEmpty() && implementation?.instructions?.any {
+        (it.opcode == Opcode.CONST_STRING || it.opcode == Opcode.CONST_STRING_JUMBO) &&
+            ((it as ReferenceInstruction).reference as StringReference).string == "onboarding_new_killer_switch_enabled"
+    } == true
 
 private fun String.smaliEscaped() = buildString {
     for (c in this@smaliEscaped) {

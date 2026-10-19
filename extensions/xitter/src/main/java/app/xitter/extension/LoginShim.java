@@ -8,6 +8,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -18,11 +20,13 @@ import java.util.concurrent.TimeUnit;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okio.Buffer;
+import okhttp3.ResponseBody;
+
 
 /**
  * Signing in. X's app signs in through a server-driven flow (POST /1.1/onboarding/task.json)
@@ -49,16 +53,15 @@ final class LoginShim {
         return url.encodedPath().endsWith("/onboarding/task.json");
     }
 
-    static Response handle(Interceptor.Chain chain, Request request, HttpUrl target) throws IOException {
+    /** `request` as the app made it; `toInstance` the same request sent to the instance. */
+    static Response handle(Interceptor.Chain chain, Request request, Request toInstance) throws IOException {
         JSONObject body = readBody(request.body());
         String flow = request.url().queryParameter("flow_name");
         String flowToken = body.optString("flow_token", "");
         boolean ours = flowToken.startsWith(PREFIX) || (flow != null && SIGN_IN_FLOWS.contains(flow));
         if (!ours) {
             // any other flow (settings, verification...) is the instance's to answer
-            Request.Builder out = request.newBuilder().url(target);
-            XitterInterceptor.sign(request, out);
-            return chain.proceed(out.build());
+            return chain.proceed(toInstance);
         }
         try {
             return step(request, flowToken, body.optJSONArray("subtask_inputs"));
@@ -201,6 +204,8 @@ final class LoginShim {
                 .put("primary_text", text("Enter your password"))
                 .put("hint", "Password")
                 .put("name", "@" + username)
+                // signing in, not choosing a password: no strength check against the server
+                .put("skip_password_validation", true)
                 .put("next_link", link("task", "next_link", "Log in"));
         return new JSONArray().put(new JSONObject().put("subtask_id", STEP_PASSWORD).put("enter_password", enterPassword));
     }
@@ -217,6 +222,11 @@ final class LoginShim {
 
     private static Response flow(Request request, String token, JSONArray subtasks) throws JSONException {
         JSONObject r = new JSONObject().put("flow_token", token).put("status", "success").put("subtasks", subtasks);
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            // the session is the token: never in the log
+            String shown = r.toString().replaceAll("\"(oauth_token|oauth_token_secret)\":\"[^\"]*\"", "\"$1\":\"<redacted>\"");
+            Log.d(TAG, "sign-in flow " + request.url().queryParameter("flow_name") + " <- " + shown);
+        }
         return XitterInterceptor.json(request, 200, r.toString());
     }
 
@@ -231,14 +241,35 @@ final class LoginShim {
 
     // ---- helpers ----
 
+    /**
+     * The request's JSON. X's build renames okio (okio.Buffer is not there), so the body is
+     * read with OkHttp's own API: an empty ResponseBody's source is an okio Buffer, which is
+     * also a sink; the body is written into it and read back as another ResponseBody.
+     */
     private static JSONObject readBody(RequestBody body) {
         if (body == null) return new JSONObject();
         try {
-            Buffer buffer = new Buffer();
-            body.writeTo(buffer);
-            String s = buffer.readUtf8();
+            // source() and its okio return type are called by name: the compiled reference would
+            // name okio.BufferedSource, which the app doesn't have under that name
+            ResponseBody empty = ResponseBody.create(new byte[0], null);
+            Object buffer = ResponseBody.class.getMethod("source").invoke(empty);
+            Method writeTo = null;
+            for (Method m : RequestBody.class.getMethods()) {
+                if (m.getName().equals("writeTo") && m.getParameterTypes().length == 1
+                        && m.getParameterTypes()[0].isInstance(buffer)) writeTo = m;
+            }
+            Method wrap = null;
+            for (Method m : ResponseBody.class.getMethods()) {
+                Class<?>[] p = m.getParameterTypes();
+                if (Modifier.isStatic(m.getModifiers()) && m.getName().equals("create") && p.length == 3
+                        && p[0].isInstance(buffer) && p[1] == MediaType.class && p[2] == long.class) wrap = m;
+            }
+            if (writeTo == null || wrap == null) throw new IllegalStateException("no okio buffer");
+            writeTo.invoke(body, buffer);
+            String s = ((ResponseBody) wrap.invoke(null, buffer, null, -1L)).string();
             return s.isEmpty() ? new JSONObject() : new JSONObject(s);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            Log.w(TAG, "could not read the sign-in request", e);
             return new JSONObject();
         }
     }

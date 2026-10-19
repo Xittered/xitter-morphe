@@ -28,21 +28,16 @@ final class OkHttpGuard {
     private OkHttpGuard() {}
 
     static void install(OkHttpClient.Builder builder) {
-        List<Interceptor> interceptors = builder.interceptors();
-        boolean present = false;
-        for (Interceptor i : interceptors) {
-            if (i instanceof XitterInterceptor) {
-                present = true;
-                break;
-            }
-        }
-        if (!present) interceptors.add(0, new XitterInterceptor());
+        // last in both lists: after X's own interceptors, which sign requests (some only for
+        // X's hosts), so the guard sees and rewrites requests as they would leave
+        addLast(builder.interceptors(), XitterInterceptor.class, new XitterInterceptor());
+        addLast(builder.networkInterceptors(), XitterInterceptor.Auth.class, new XitterInterceptor.Auth());
 
         builder.dns(GUARD_DNS);
         // an explicit proxy would resolve hosts itself, out of the DNS guard's reach
         builder.proxy(null);
         builder.proxySelector(new GuardProxySelector(ProxySelector.getDefault()));
-        // sessions are sent by XitterInterceptor; a cookie jar would overwrite them
+        // sessions are sent by XitterInterceptor.Auth; a cookie jar would overwrite them
         builder.cookieJar(CookieJar.NO_COOKIES);
 
         // the system's trust store and hostname checks instead of X's
@@ -51,6 +46,14 @@ final class OkHttpGuard {
         builder.setCertificateChainCleaner$okhttp(null);
         builder.hostnameVerifier(OkHostnameVerifier.INSTANCE);
         builder.certificatePinner(CertificatePinner.DEFAULT);
+    }
+
+    private static void addLast(List<Interceptor> list, Class<?> type, Interceptor interceptor) {
+        // a client made from another (newBuilder()) already has it, possibly no longer last
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (type.isInstance(list.get(i))) list.remove(i);
+        }
+        list.add(interceptor);
     }
 
     static final Dns GUARD_DNS = new Dns() {
