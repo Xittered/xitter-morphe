@@ -1,3 +1,14 @@
+## [1.1.0-dev.2](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.1...v1.1.0-dev.2) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+* keep X and instance links in the app; send other X links to the instance ([ba18c13](https://github.com/jakeayy/xitter-morphe/commit/ba18c138cd454505b133f36b92e4392100f321d2))
+
+### ✨ New Features
+
+* notifications tab from the instance's GraphQL timeline ([1dcbc82](https://github.com/jakeayy/xitter-morphe/commit/1dcbc8292102d3295ab18759d360730c3da0affc))
+* profiles, post detail, posting and replies ([e52e6ec](https://github.com/jakeayy/xitter-morphe/commit/e52e6ece4dfc4f754532967a08ac7d46d8b51ffd))
+
 ## [1.1.0-dev.1](https://github.com/jakeayy/xitter-morphe/compare/v1.0.0...v1.1.0-dev.1) (2026-10-19)
 
 ### 🐛 Bug Fixes
