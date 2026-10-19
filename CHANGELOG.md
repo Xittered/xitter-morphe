@@ -1,3 +1,9 @@
+## [1.1.0-dev.7](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.6...v1.1.0-dev.7) (2026-10-19)
+
+### ✨ New Features
+
+* blocked/muted accounts, in-app web settings pages, password change ([05d3cd9](https://github.com/Xittered/xitter-morphe/commit/05d3cd935e85b8bd81bde82cc34ab78f1658ba7f))
+
 ## [1.1.0-dev.6](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.5...v1.1.0-dev.6) (2026-10-19)
 
 ### ✨ New Features

@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T16:15:29",
-  "description": "## [1.1.0-dev.6](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.5...v1.1.0-dev.6) (2026-10-19)\n\n### ✨ New Features\n\n* communities (explore, memberships, community page and timelines, join/leave) ([bdcfdbd](https://github.com/Xittered/xitter-morphe/commit/bdcfdbdcffa6d312217b782c13136ae5b6954c74))",
-  "download_url": "https://github.com/Xittered/xitter-morphe/releases/download/v1.1.0-dev.6/patches-1.1.0-dev.6.mpp",
+  "created_at": "2026-10-19T17:26:31",
+  "description": "## [1.1.0-dev.7](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.6...v1.1.0-dev.7) (2026-10-19)\n\n### ✨ New Features\n\n* blocked/muted accounts, in-app web settings pages, password change ([05d3cd9](https://github.com/Xittered/xitter-morphe/commit/05d3cd935e85b8bd81bde82cc34ab78f1658ba7f))",
+  "download_url": "https://github.com/Xittered/xitter-morphe/releases/download/v1.1.0-dev.7/patches-1.1.0-dev.7.mpp",
   "signature_download_url": "",
-  "version": "1.1.0-dev.6"
+  "version": "1.1.0-dev.7"
 }
