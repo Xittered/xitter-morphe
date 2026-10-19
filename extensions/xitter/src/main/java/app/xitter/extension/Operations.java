@@ -8,8 +8,7 @@ import java.util.Map;
 
 /**
  * X's Android app asks for the same data as the web client under its own GraphQL operations:
- * some under another name, most with the result under other keys (its queries alias them, e.g.
- * the home timeline is `timeline_response.timeline` rather than `home.home_timeline_urt`).
+ * some under another name, some with the result under other keys (its queries alias them).
  * Each Android operation is sent to the web operation the instance answers, and the result is
  * moved to where the app reads it.
  */
@@ -33,8 +32,8 @@ final class Operations {
     private static final Map<String, Op> OPS = new HashMap<>();
 
     static {
+        // "For you"; "Following" (HomeLatestTimeline) reads the web's keys as they are
         OPS.put("HomeTimeline", new Op("HomeTimeline", "home.home_timeline_urt", "timeline_response.timeline"));
-        OPS.put("HomeTimelineLatest", new Op("HomeLatestTimeline", "home.home_timeline_urt", "timeline_response.timeline"));
         OPS.put("ViewerUserQuery", new Op("Viewer", null, null));
     }
 
