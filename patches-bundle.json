@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T21:11:57",
-  "description": "## [1.1.0-dev.9](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.8...v1.1.0-dev.9) (2026-10-19)\n\n### ✨ New Features\n\n* chat (XChat) with the instance's key backup realm ([586c54d](https://github.com/Xittered/xitter-morphe/commit/586c54d6cce08d92ace5bbdd17d830679a787ef4))",
-  "download_url": "https://github.com/Xittered/xitter-morphe/releases/download/v1.1.0-dev.9/patches-1.1.0-dev.9.mpp",
+  "created_at": "2026-10-19T21:51:04",
+  "description": "## [1.1.0-dev.10](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.9...v1.1.0-dev.10) (2026-10-19)\n\n### ✨ New Features\n\n* pride flag picker in Edit profile ([2b6a9f9](https://github.com/Xittered/xitter-morphe/commit/2b6a9f913c78f79f1681ba717783c1632b5644bf))\n* the instance's SVG badges (pride flags) drawn as PNG for the app ([ca90c55](https://github.com/Xittered/xitter-morphe/commit/ca90c5503c5dd960b8511781ff8114ea625d1e11))",
+  "download_url": "https://github.com/Xittered/xitter-morphe/releases/download/v1.1.0-dev.10/patches-1.1.0-dev.10.mpp",
   "signature_download_url": "",
-  "version": "1.1.0-dev.9"
+  "version": "1.1.0-dev.10"
 }

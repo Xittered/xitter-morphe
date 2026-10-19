@@ -1,3 +1,10 @@
+## [1.1.0-dev.10](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.9...v1.1.0-dev.10) (2026-10-19)
+
+### ✨ New Features
+
+* pride flag picker in Edit profile ([2b6a9f9](https://github.com/Xittered/xitter-morphe/commit/2b6a9f913c78f79f1681ba717783c1632b5644bf))
+* the instance's SVG badges (pride flags) drawn as PNG for the app ([ca90c55](https://github.com/Xittered/xitter-morphe/commit/ca90c5503c5dd960b8511781ff8114ea625d1e11))
+
 ## [1.1.0-dev.9](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.8...v1.1.0-dev.9) (2026-10-19)
 
 ### ✨ New Features
