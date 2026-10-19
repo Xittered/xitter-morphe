@@ -69,12 +69,39 @@ GITHUB_ACTOR=<you> GITHUB_TOKEN=$(gh auth token) ./gradlew :patches:buildAndroid
 
 Output: `patches/build/libs/patches-*.mpp`.
 
-## Limits
+## How it talks to Xitter
 
-The app side is complete, but **the Xitter server answers the web client's API, not the
-Android app's**. Of the 319 GraphQL operations X Android 12.19.1 uses, 21 share a name with
-Xitter's handlers (HomeTimeline, CreateTweet, FavoriteTweet, SearchTimeline, …). Profiles,
-post detail and most lists use Android-only operations (`UserResultByScreenNameQuery`,
-`ConversationTimelineV2`, `UserWithProfileTweetsQueryV2`, `ViewerUserQuery`, …). Unhandled
-calls get an empty `{data:{}}`, and Xitter lists them at `GET /_debug/unknown`. Those screens
-need Android aliases on the server.
+X's Android app speaks its own dialect of X's API; Xitter answers the web client's. The extension
+translates on the device, so the instance needs no changes:
+
+- **Operations**: Android GraphQL operations are sent as the web's (e.g. `UserWithProfileTweetsQueryV2`
+  → `UserTweets`), variables renamed, ids sent as strings, results moved to where the app reads
+  them (`Operations.java`).
+- **Shapes**: typed objects get `__typename` first, Android's field aliases (`content`,
+  `tweetResult`, `userResult`, `ownerResult`), users a `legacy` record (`Shapes.java`).
+- **Older REST screens**: notifications and search are answered from the web's GraphQL
+  timelines in the old `globalObjects` format (`V2Timelines.java`); followers/following from an
+  Apollo-shaped timeline (`Connections.java`, `ApolloTimelines.java`).
+- **Answered locally**: app/guest tokens, Play Integrity and key attestation, feature switches,
+  analytics.
+- **Classic UI**: X Lite (X's newer UI, Apollo-only) is switched off, and the Jetfuel welcome
+  screen replaced by the classic sign-in.
+
+## Status
+
+Tested on a device against an unmodified Xitter server: sign-in, home (For you, Following),
+profiles (posts, replies, media, likes, followers, following), post detail, posting and replies,
+likes, bookmarks, notifications, search (top, latest, people, media), lists, links (in-app or to
+the instance; X pages are never loaded).
+
+Not working yet: chat (needs the instance's Juicebox realm; untested), communities, Explore,
+most settings screens. Accounts with two-factor sign-in can't sign in from the app.
+
+## Debugging
+
+```
+adb shell setprop log.tag.Xitter DEBUG        # each request, its auth and status
+adb shell setprop log.tag.XitterBody DEBUG    # request and response bodies
+adb shell setprop log.tag.XitterErrors DEBUG  # errors X's app recovers from and would report
+adb logcat -s Xitter XitterBody XitterErrors
+```
