@@ -265,7 +265,10 @@ final class XitterInterceptor implements Interceptor {
 
     private static final String FEATURE_SWITCHES = "{"
             // followers and following: the timeline screens (the new page is an Apollo query)
-            + "\"android_follower_timelines_stack_enabled\":{\"value\":false}"
+            + "\"android_follower_timelines_stack_enabled\":{\"value\":false},"
+            // a profile's badge (the instance's pride flags travel as an affiliate badge) after the
+            // name in the profile header, as the web client shows it (HeaderBadge)
+            + "\"blue_business_affiliate_badge_consumption_ui_enabled\":{\"value\":true}"
             + "}";
 
     private static boolean isTelemetry(String path) {

@@ -255,6 +255,46 @@ val xitterPatch = bytecodePatch(
             println("Xitter: flag picker added to Edit profile (${returns.size})")
         }
 
+        // A profile header's badge after the name for unverified accounts too (HeaderBadge): X's
+        // header only adds it for verified ones. The header's name method is the one checking
+        // "identity_verification_educational_prompt_enabled"; its 2nd and 3rd parameters are the
+        // verified status and the badge, and it writes the name into a TypefacesTextView field.
+        val header = mutableClassDefByOrNull("Lcom/twitter/app/profiles/header/f;")
+        val nameMethod = header?.methods?.firstOrNull { m ->
+            m.parameterTypes.size >= 3 && m.implementation?.instructions?.any {
+                (it.opcode == Opcode.CONST_STRING || it.opcode == Opcode.CONST_STRING_JUMBO) &&
+                    ((it as ReferenceInstruction).reference as StringReference).string == "identity_verification_educational_prompt_enabled"
+            } == true
+        }
+        val nameField = nameMethod?.implementation?.instructions?.firstNotNullOfOrNull {
+            if (it.opcode != Opcode.IGET_OBJECT) return@firstNotNullOfOrNull null
+            val f = (it as ReferenceInstruction).reference as com.android.tools.smali.dexlib2.iface.reference.FieldReference
+            if (f.type.endsWith("TypefacesTextView;")) f else null
+        }
+        val impl = nameMethod?.implementation
+        val wide = nameMethod?.parameterTypes?.take(3)?.any { it.toString() == "J" || it.toString() == "D" } == true
+        val locals = if (impl == null || nameMethod == null) 0 else impl.registerCount - nameMethod.parameterTypes.sumOf { if (it.toString() == "J" || it.toString() == "D") 2 as Int else 1 } - 1
+        if (nameMethod == null || nameField == null || wide || locals < 3) {
+            println("Xitter: profile header name not found, its badge stays verified-only")
+        } else {
+            // the parameters are read at the start: the method reuses their registers later
+            val returns = impl!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_VOID }.map { it.index }.reversed()
+            for (at in returns) {
+                nameMethod.addInstruction(at, "invoke-static {}, ${EXTENSION_PACKAGE}HeaderBadge;->end()V")
+            }
+            nameMethod.addInstructions(
+                0,
+                """
+                    move-object/from16 v0, p0
+                    iget-object v0, v0, ${nameField.definingClass}->${nameField.name}:${nameField.type}
+                    move-object/from16 v1, p2
+                    move-object/from16 v2, p3
+                    invoke-static {v0, v1, v2}, ${EXTENSION_PACKAGE}HeaderBadge;->begin(Landroid/widget/TextView;Ljava/lang/Object;Ljava/lang/Object;)V
+                """,
+            )
+            println("Xitter: profile header shows badges for every account (${returns.size})")
+        }
+
         // 4. Everything else that opens connections or resolves hosts.
         redirectPlatformCalls()
     }

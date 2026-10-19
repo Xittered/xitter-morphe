@@ -91,7 +91,7 @@ translates on the device, so the instance needs no changes:
 
 Tested on a device against an unmodified Xitter server: sign-in, home (For you, Following),
 profiles (posts, replies, media, likes, followers, following), editing your profile (with the
-instance's pride flag picker under Website; flags show next to names in posts), follow and
+instance's pride flag picker under Website; flags show next to names in posts and profiles), follow and
 unfollow, post detail, posting and replies, photo posts, reposts and quotes, likes, bookmarks,
 notifications, search (top, latest, people, media), Explore (trends), lists, communities
 (explore, community pages, join and leave), chat (end-to-end encrypted, with passcode backup on
