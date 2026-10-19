@@ -48,6 +48,11 @@ final class Operations {
         op("CreateTweet", new Op("CreateTweet", "create_tweet.tweet_results", "create_tweet.tweet_result"));
         op("CreateNoteTweet", new Op("CreateNoteTweet", "notetweet_create.tweet_results", "notetweet_create.tweet_result"));
 
+        // bookmarks
+        op("BookmarkTimelineV2", new Op("Bookmarks", "bookmark_timeline_v2.timeline", "timeline_response.timeline"));
+        op("BookmarkAdd", new Op("CreateBookmark", null, null));
+        op("BookmarkDelete", new Op("DeleteBookmark", null, null));
+
         // a post and its replies
         op("ConversationTimelineV2", new Op("TweetDetail", "threaded_conversation_with_injections_v2", "timeline_response"));
 
