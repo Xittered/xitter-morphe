@@ -101,6 +101,8 @@ final class XitterInterceptor implements Interceptor {
             throw e;
         }
         if (graphql) response = reshaped(chain, out, target, operation, response);
+        // badges the instance draws as SVG (pride flags), which the app can't decode
+        else if (SvgBadges.handles(response)) response = SvgBadges.asPng(response);
         return logBody(target, response);
     }
 
