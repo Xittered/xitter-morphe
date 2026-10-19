@@ -1,3 +1,9 @@
+## [1.1.0-dev.9](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.8...v1.1.0-dev.9) (2026-10-19)
+
+### ✨ New Features
+
+* chat (XChat) with the instance's key backup realm ([586c54d](https://github.com/Xittered/xitter-morphe/commit/586c54d6cce08d92ace5bbdd17d830679a787ef4))
+
 ## [1.1.0-dev.8](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.7...v1.1.0-dev.8) (2026-10-19)
 
 ### ✨ New Features
