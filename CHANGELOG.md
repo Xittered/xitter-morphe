@@ -1,3 +1,9 @@
+## [1.1.0-dev.11](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.10...v1.1.0-dev.11) (2026-10-19)
+
+### ✨ New Features
+
+* pride flag in the profile header ([855a5fd](https://github.com/Xittered/xitter-morphe/commit/855a5fde4ac297fe0ecaa2b457ffdf664f48322a))
+
 ## [1.1.0-dev.10](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.9...v1.1.0-dev.10) (2026-10-19)
 
 ### ✨ New Features
