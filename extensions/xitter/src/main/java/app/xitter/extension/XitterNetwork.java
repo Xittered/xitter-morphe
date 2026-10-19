@@ -213,9 +213,22 @@ public final class XitterNetwork {
     }
 
     // ---- WebView ----
+    // X's pages aren't the instance's: a WebView would load the instance's own signed-out page
+    // (X's app loads x.com in a hidden WebView to set up web sign-in, and would then hand that
+    // page to the browser). X's addresses are not loaded at all; anything else allowed is.
+
+    private static String webViewTarget(String url) {
+        if (url == null) return null;
+        try {
+            String host = URI.create(url.trim()).getHost();
+            if (host != null && isXHost(host)) return null;
+        } catch (IllegalArgumentException ignored) {
+        }
+        return rewrite(url);
+    }
 
     public static void loadUrl(android.webkit.WebView view, String url) {
-        String to = rewrite(url);
+        String to = webViewTarget(url);
         if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
@@ -225,7 +238,7 @@ public final class XitterNetwork {
     }
 
     public static void loadUrl(android.webkit.WebView view, String url, Map<String, String> headers) {
-        String to = rewrite(url);
+        String to = webViewTarget(url);
         if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
@@ -235,7 +248,7 @@ public final class XitterNetwork {
     }
 
     public static void postUrl(android.webkit.WebView view, String url, byte[] body) {
-        String to = rewrite(url);
+        String to = webViewTarget(url);
         if (to == null) {
             blocked(url);
             view.loadUrl("about:blank");
@@ -247,7 +260,9 @@ public final class XitterNetwork {
     // ---- links handed to other apps (the browser, Custom Tabs) ----
 
     public static void startActivity(android.content.Context context, android.content.Intent intent) {
-        context.startActivity(outbound(context, intent));
+        android.content.Intent out = outbound(context, intent);
+        if (out != intent && Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "link " + intent.toUri(0) + " -> " + out.toUri(0));
+        context.startActivity(out);
     }
 
     public static void startActivity(android.content.Context context, android.content.Intent intent, android.os.Bundle options) {

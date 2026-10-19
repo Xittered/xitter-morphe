@@ -42,7 +42,7 @@ final class Operations {
     static {
         // home: "For you"; "Following" (HomeLatestTimeline) reads the web's keys as they are
         op("HomeTimeline", new Op("HomeTimeline", "home.home_timeline_urt", "timeline_response.timeline"));
-        op("ViewerUserQuery", new Op("Viewer", null, null));
+        op("ViewerUserQuery", new Op("Viewer", "viewer.user_results", "viewer.userResult"));
 
         // posting: the app reads the new post from "tweet_result"
         op("CreateTweet", new Op("CreateTweet", "create_tweet.tweet_results", "create_tweet.tweet_result"));
