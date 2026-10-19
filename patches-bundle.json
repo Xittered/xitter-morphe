@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T09:38:23",
-  "description": "## 1.0.0 (2026-10-19)\n\n### 🐛 Bug Fixes\n\n* add patch list markers to README for releases ([14f4acb](https://github.com/jakeayy/xitter-morphe/commit/14f4acb8ee968e2ab3cd002863b585a1ed31861d))\n* make gradlew executable for CI ([f13f673](https://github.com/jakeayy/xitter-morphe/commit/f13f6739b5a8ea4e7babac49c6c7280e4c6230bf))\n\n### ✨ New Features\n\n* Xitter patches for X 12.19.1 ([d6f5188](https://github.com/jakeayy/xitter-morphe/commit/d6f5188b50b903dc5f59a6f5190cb8eb2219f300))",
-  "download_url": "https://github.com/jakeayy/xitter-morphe/releases/download/v1.0.0/patches-1.0.0.mpp",
+  "created_at": "2026-10-19T11:48:10",
+  "description": "## [1.1.0-dev.1](https://github.com/jakeayy/xitter-morphe/compare/v1.0.0...v1.1.0-dev.1) (2026-10-19)\n\n### 🐛 Bug Fixes\n\n* For you reads its timeline under timeline_response.timeline ([196514e](https://github.com/jakeayy/xitter-morphe/commit/196514ecc3321f85e0d2d68a388eddb752dfc9d3))\n* sign in and reach the home timeline on a real device ([9a991a4](https://github.com/jakeayy/xitter-morphe/commit/9a991a40f5b8a9e2ca9a2266d48899141557ef08))\n\n### ✨ New Features\n\n* classic UI and timelines against an unmodified Xitter server ([83b3b8a](https://github.com/jakeayy/xitter-morphe/commit/83b3b8accb8511056c1b959445c8c838f03ab34a))",
+  "download_url": "https://github.com/jakeayy/xitter-morphe/releases/download/v1.1.0-dev.1/patches-1.1.0-dev.1.mpp",
   "signature_download_url": "",
-  "version": "1.0.0"
+  "version": "1.1.0-dev.1"
 }
