@@ -1,3 +1,10 @@
+## [1.1.0-dev.4](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.3...v1.1.0-dev.4) (2026-10-19)
+
+### ✨ New Features
+
+* bookmarks (list, add, remove) ([a48f73b](https://github.com/Xittered/xitter-morphe/commit/a48f73b5c5090eac3a0f9fc198a7ebcbeb36b394))
+* lists (management, list page and timeline, members, edits) ([da08c01](https://github.com/Xittered/xitter-morphe/commit/da08c017af7f0ae3636c4901f6cfbc55afa58ad3))
+
 ## [1.1.0-dev.3](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.2...v1.1.0-dev.3) (2026-10-19)
 
 ### 🐛 Bug Fixes

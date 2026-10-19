@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T12:43:50",
-  "description": "## [1.1.0-dev.3](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.2...v1.1.0-dev.3) (2026-10-19)\n\n### 🐛 Bug Fixes\n\n* home/notifications loop; viewer query ([ca4037b](https://github.com/jakeayy/xitter-morphe/commit/ca4037bff1fa878f63e39c08548bc1e5ea0ac19c))\n\n### ✨ New Features\n\n* profile replies, media and likes tabs, followers and following ([f26fb36](https://github.com/jakeayy/xitter-morphe/commit/f26fb366749d8b84d34345d6bffc393901b9c378))\n* search, through the same REST-to-GraphQL timeline conversion ([2c94734](https://github.com/jakeayy/xitter-morphe/commit/2c9473406c4e54db802d5525aabb26211f9c92c8))",
-  "download_url": "https://github.com/jakeayy/xitter-morphe/releases/download/v1.1.0-dev.3/patches-1.1.0-dev.3.mpp",
+  "created_at": "2026-10-19T15:38:25",
+  "description": "## [1.1.0-dev.4](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.3...v1.1.0-dev.4) (2026-10-19)\n\n### ✨ New Features\n\n* bookmarks (list, add, remove) ([a48f73b](https://github.com/Xittered/xitter-morphe/commit/a48f73b5c5090eac3a0f9fc198a7ebcbeb36b394))\n* lists (management, list page and timeline, members, edits) ([da08c01](https://github.com/Xittered/xitter-morphe/commit/da08c017af7f0ae3636c4901f6cfbc55afa58ad3))",
+  "download_url": "https://github.com/Xittered/xitter-morphe/releases/download/v1.1.0-dev.4/patches-1.1.0-dev.4.mpp",
   "signature_download_url": "",
-  "version": "1.1.0-dev.3"
+  "version": "1.1.0-dev.4"
 }
