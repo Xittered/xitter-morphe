@@ -1,3 +1,9 @@
+## [1.1.0-dev.6](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.5...v1.1.0-dev.6) (2026-10-19)
+
+### ✨ New Features
+
+* communities (explore, memberships, community page and timelines, join/leave) ([bdcfdbd](https://github.com/Xittered/xitter-morphe/commit/bdcfdbdcffa6d312217b782c13136ae5b6954c74))
+
 ## [1.1.0-dev.5](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.4...v1.1.0-dev.5) (2026-10-19)
 
 ### ✨ New Features
