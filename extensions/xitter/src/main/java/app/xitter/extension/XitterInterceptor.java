@@ -45,6 +45,8 @@ final class XitterInterceptor implements Interceptor {
         // what the instance reads: uncompressed bodies
         request = withFormFields(Bodies.uncompressed(request), path);
         HttpUrl target = x ? HttpUrl.get(XitterNetwork.rewrite(url.toString())) : url;
+        // a photo sent in one request: the instance's chunked upload (MediaUpload)
+        if (MediaUpload.handles(target, request)) return log(request, target, MediaUpload.handle(chain, request, target), "upload");
         // the app's GraphQL operation, and the one the instance answers for it
         String operation = null;
         if (target.encodedPath().contains("/graphql/")) {
@@ -98,17 +100,19 @@ final class XitterInterceptor implements Interceptor {
             if (Log.isLoggable(XitterNetwork.TAG, Log.DEBUG)) Log.d(XitterNetwork.TAG, out.method() + " " + target.encodedPath() + " failed: " + e);
             throw e;
         }
-        if (graphql) response = reshaped(operation, response);
+        if (graphql) response = reshaped(chain, out, target, operation, response);
         return logBody(target, response);
     }
 
-    private static Response reshaped(String operation, Response response) throws IOException {
+    private static Response reshaped(Chain chain, Request request, HttpUrl target, String operation, Response response) throws IOException {
         ResponseBody body = response.body();
         MediaType type = body == null ? null : body.contentType();
         if (body == null || type == null || !"json".equals(type.subtype())) return response;
         byte[] bytes = body.bytes();
         if ("gzip".equalsIgnoreCase(response.header("Content-Encoding"))) bytes = Bodies.gunzip(bytes);
         String json = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        // a repost: the app stores it, so it gets the repost itself (Reposts)
+        if (response.isSuccessful() && Reposts.handles(operation)) json = Reposts.complete(chain, request, target, json);
         try {
             json = Shapes.reshape(operation, json);
         } catch (Exception e) {

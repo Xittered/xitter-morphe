@@ -46,6 +46,8 @@ final class Operations {
 
         // posting: the app reads the new post from "tweet_result"
         op("CreateTweet", new Op("CreateTweet", "create_tweet.tweet_results", "create_tweet.tweet_result"));
+        // a repost: the app reads it (completed by Reposts) from "tweet_result"
+        op("CreateRetweet", new Op("CreateRetweet", "create_retweet.retweet_results", "create_retweet.tweet_result"));
         op("CreateNoteTweet", new Op("CreateNoteTweet", "notetweet_create.tweet_results", "notetweet_create.tweet_result"));
 
         // bookmarks

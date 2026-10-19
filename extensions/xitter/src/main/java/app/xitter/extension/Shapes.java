@@ -92,6 +92,7 @@ final class Shapes {
             JSONObject r = communityResults.optJSONObject("result");
             if (r != null && r.has("rest_id")) communityResults.put("rest_id", r.getString("rest_id"));
         }
+        if (out.has("full_text") && out.has("display_text_range")) mediaLinks(out);
         // a post's edit state is a typed union too: an edit points at the first version
         JSONObject edit = out.optJSONObject("edit_control");
         if (edit != null && !edit.has("__typename")) {
@@ -103,6 +104,38 @@ final class Shapes {
             out.put("edit_control", typed);
         }
         return out;
+    }
+
+    /**
+     * A post's photos and videos: X puts their link at the end of the text, past what is shown
+     * (display_text_range), and the app hides the text the media entity's indices cover. The
+     * instance leaves the link out (indices of no width at the end), which the app shows as a
+     * link of its own; the link is added after the shown text, as X has it.
+     */
+    private static void mediaLinks(JSONObject legacy) throws JSONException {
+        JSONArray media = legacy.optJSONObject("entities") == null ? null : legacy.getJSONObject("entities").optJSONArray("media");
+        if (media == null || media.length() == 0) return;
+        JSONObject first = media.optJSONObject(0);
+        JSONArray at = first == null ? null : first.optJSONArray("indices");
+        if (at == null || at.length() != 2 || at.optInt(0) != at.optInt(1)) return;
+        String text = legacy.optString("full_text");
+        String link = first.optString("url", first.optString("expanded_url"));
+        if (link.isEmpty()) return;
+        String joined = text.isEmpty() ? link : text + " " + link;
+        int start = joined.codePointCount(0, joined.length()) - link.codePointCount(0, link.length());
+        int end = start + link.codePointCount(0, link.length());
+        legacy.put("full_text", joined);
+        // every photo of the post is that one link
+        for (String key : new String[] {"entities", "extended_entities"}) {
+            JSONObject entities = legacy.optJSONObject(key);
+            JSONArray list = entities == null ? null : entities.optJSONArray("media");
+            for (int i = 0; list != null && i < list.length(); i++) {
+                JSONObject m = list.optJSONObject(i);
+                if (m == null) continue;
+                m.put("indices", new JSONArray().put(start).put(end));
+                if (!m.has("url")) m.put("url", link);
+            }
+        }
     }
 
     /** Fields the app's timeline queries alias differently from the web client's. */
