@@ -73,6 +73,10 @@ final class XitterInterceptor implements Interceptor {
             }
         }
 
+        // the notifications tab, from the instance's GraphQL timeline
+        String notifications = Notifications.timelineType(target.encodedPath());
+        if (notifications != null) return log(request, target, Notifications.handle(chain, request, target, notifications), "notifications");
+
         // X's sign-in and sign-up screens, answered on the device with the instance's sign-in
         if (LoginShim.handles(url)) return LoginShim.handle(chain, request, out);
 
