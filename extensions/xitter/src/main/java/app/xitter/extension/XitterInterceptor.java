@@ -44,6 +44,8 @@ final class XitterInterceptor implements Interceptor {
         Response local = localAnswer(request, path);
         if (local != null) return log(request, url, local, "local");
 
+        // what the instance reads: uncompressed bodies
+        request = Bodies.uncompressed(request);
         HttpUrl target = x ? HttpUrl.get(XitterNetwork.rewrite(url.toString())) : url;
         // the app's GraphQL operation, and the one the instance answers for it
         String operation = null;
@@ -52,9 +54,11 @@ final class XitterInterceptor implements Interceptor {
             operation = segments.get(segments.size() - 1);
             String server = Operations.serverName(operation);
             if (!server.equals(operation)) target = target.newBuilder().setPathSegment(segments.size() - 1, server).build();
+            // and its variables, named as the web operation names them
+            String vars = target.queryParameter("variables");
+            if (vars != null) target = target.newBuilder().setQueryParameter("variables", Operations.variables(operation, vars)).build();
+            request = withBodyVariables(request, operation);
         }
-        // what the instance reads: uncompressed bodies
-        request = Bodies.uncompressed(request);
         Request.Builder rewritten = request.newBuilder().url(target);
         boolean graphql = target.encodedPath().contains("/graphql/");
         // GraphQL answers are reshaped (Shapes), so they must be readable here: gzip, not
@@ -62,6 +66,12 @@ final class XitterInterceptor implements Interceptor {
         if (Log.isLoggable(XitterNetwork.TAG + "Body", Log.DEBUG)) rewritten.header("Accept-Encoding", "identity");
         else if (graphql) rewritten.header("Accept-Encoding", "gzip");
         Request out = rewritten.build();
+        if (Log.isLoggable(XitterNetwork.TAG + "Body", Log.DEBUG) && out.body() != null) {
+            try {
+                Log.d(XitterNetwork.TAG + "Body", "request " + target.encodedPath() + " " + new String(Bodies.read(out.body()), java.nio.charset.StandardCharsets.UTF_8));
+            } catch (IOException ignored) {
+            }
+        }
 
         // X's sign-in and sign-up screens, answered on the device with the instance's sign-in
         if (LoginShim.handles(url)) return LoginShim.handle(chain, request, out);
@@ -146,6 +156,24 @@ final class XitterInterceptor implements Interceptor {
             }
             String app = XitterConfig.clientToken();
             if (app != null && !app.trim().isEmpty()) out.header("Authorization", "Bearer " + app.trim());
+        }
+    }
+
+    // a POST's variables, in its JSON body
+    private static Request withBodyVariables(Request request, String operation) throws IOException {
+        okhttp3.RequestBody body = request.body();
+        MediaType type = body == null ? null : body.contentType();
+        if (body == null || type == null || !"json".equals(type.subtype())) return request;
+        try {
+            org.json.JSONObject json = new org.json.JSONObject(new String(Bodies.read(body), java.nio.charset.StandardCharsets.UTF_8));
+            Object vars = json.opt("variables");
+            if (vars == null) return request;
+            String renamed = Operations.variables(operation, vars.toString());
+            if (renamed.equals(vars.toString())) return request;
+            json.put("variables", vars instanceof String ? renamed : new org.json.JSONObject(renamed));
+            return request.newBuilder().method(request.method(), okhttp3.RequestBody.create(json.toString(), type)).build();
+        } catch (org.json.JSONException e) {
+            return request;
         }
     }
 

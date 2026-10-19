@@ -121,6 +121,8 @@ public final class XitterNetwork {
         if (under(host, "chat-ws.x.com") && path.startsWith("/ws")) return "/xchat" + path;
         if (host.equals("chat.x.com") || host.equals("chat-staging.x.com")) return "/xchat" + path;
         if (host.startsWith("realm-") && under(host, "x.com")) return "/juicebox" + path;
+        // the live updates stream, which the instance serves without the version
+        if (path.equals("/1.1/live_pipeline/events")) return "/live_pipeline/events";
         return path;
     }
 

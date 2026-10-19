@@ -40,6 +40,13 @@ final class Shapes {
         String typename = in.optString("__typename", null);
         String type = in.optString("type", null);
         if (typename == null && type != null && type.startsWith("Timeline")) typename = type;
+        // results some answers leave untyped (a post just created): a post has its text in
+        // "legacy", a user its handle in "core"
+        if (typename == null && in.has("rest_id")) {
+            JSONObject legacy = in.optJSONObject("legacy"), core = in.optJSONObject("core");
+            if (legacy != null && legacy.has("full_text")) typename = "Tweet";
+            else if (core != null && core.has("screen_name")) typename = "User";
+        }
 
         // org.json keeps insertion order: the type goes in first
         JSONObject out = new JSONObject();
