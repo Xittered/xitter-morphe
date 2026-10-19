@@ -56,6 +56,19 @@ final class Operations {
         // Explore: one timeline, inline in the page
         op("Explore", new Op("ExplorePage", "explore_page.body", "explore_page.pageBody"));
 
+        // communities
+        op("CommunitiesExploreTimelineQuery", new Op("CommunitiesExploreTimeline", "viewer.explore_communities_timeline.timeline", "viewer.timeline_response.timeline"));
+        op("CommunitiesTimelineQuery", new Op("CommunitiesMainPageTimeline", "viewer.communities_timeline.timeline", "viewer.timeline_response.timeline"));
+        op("CommunityInfoQuery", new Op("CommunityByRestId", "communityResults", "community_results_by_rest_id", "community_rest_id", "communityId"));
+        op("CommunityRankedTimelineQuery", new Op("CommunityTweetsRankedTimeline", "communityResults.result.ranked_community_timeline.timeline",
+                "community_by_rest_id.timeline_response.timeline", "community_rest_id", "communityId"));
+        op("CommunityMediaTimelineQuery", new Op("CommunityMediaTimeline", "communityResults.result.community_media_timeline.timeline",
+                "community_by_rest_id.timeline_response.timeline", "community_rest_id", "communityId"));
+        op("CommunityJoinQuery", new Op("JoinCommunity", null, null, "community_rest_id", "communityId"));
+        op("CommunityLeaveQuery", new Op("LeaveCommunity", null, null, "community_rest_id", "communityId"));
+        op("CommunityJoinRequestCreate", new Op("RequestToJoinCommunity", null, null, "community_rest_id", "communityId"));
+        op("CommunityMembershipsSlice", new Op("CommunitiesMembershipsSlice", "viewer.user_results.result.community_memberships_slice", "viewer.user.community_memberships_slice"));
+
         // lists
         op("ViewerListManagementTimeline", new Op("ListsManagementPageTimeline", "viewer.list_management_timeline.timeline", "viewer.timeline_response.timeline"));
         op("ListByIdQuery", new Op("ListByRestId", null, null, "rest_id", "listId"));
@@ -156,6 +169,19 @@ final class Operations {
             JSONObject next = new JSONObject();
             at.put(op.to[i], next);
             at = next;
+        }
+        // a slice of communities: "items", each with its rest_id beside the result
+        if (result instanceof JSONObject && ((JSONObject) result).has("items_results")) {
+            JSONObject slice = (JSONObject) result;
+            org.json.JSONArray from = slice.getJSONArray("items_results"), items = new org.json.JSONArray();
+            for (int i = 0; i < from.length(); i++) {
+                JSONObject item = from.getJSONObject(i);
+                JSONObject r = item.optJSONObject("result");
+                if (r != null && !item.has("rest_id")) item.put("rest_id", r.optString("rest_id"));
+                items.put(item);
+            }
+            slice.remove("items_results");
+            slice.put("items", items);
         }
         at.put(op.to[op.to.length - 1], result);
         if ("Explore".equals(operation)) moved.getJSONObject("explore_page").put("id", "explore");

@@ -58,6 +58,40 @@ final class Shapes {
             if (!k.equals("__typename")) out.put(renamed(typename, k), walk(in.get(k)));
         }
         if ("User".equals(typename) && !out.has("legacy")) out.put("legacy", legacyUser(out));
+        // a community's actions: the app requires the profile-spotlight one, which the instance
+        // only sends with some answers
+        JSONObject actions = "Community".equals(typename) ? out.optJSONObject("actions") : null;
+        if (actions != null && !actions.has("community_spotlight_setup_action_result")) {
+            actions.put("community_spotlight_setup_action_result", new JSONObject()
+                    .put("__typename", "CommunitySpotlightSetupActionUnavailable").put("reason", "NotSupported").put("message", ""));
+        }
+        // what the app requires on every community
+        if ("Community".equals(typename)) {
+            for (String k : new String[] {"member_count", "moderator_count", "new_tweet_count_since_last_viewed"}) {
+                if (!out.has(k)) out.put(k, 0);
+            }
+            // and the other fields it can't do without
+            if (!out.has("access")) out.put("access", "Public");
+            if (!out.has("default_theme")) out.put("default_theme", "Default");
+            if (!out.has("role")) out.put("role", "NonMember");
+            if (!out.has("members_facepile_results")) out.put("members_facepile_results", new JSONArray());
+            if (!out.has("rules")) out.put("rules", new JSONArray());
+        }
+        // and the viewer's relationship with it needs its actions and role
+        JSONObject relationship = "Community".equals(typename) ? out.optJSONObject("viewer_relationship") : null;
+        if (relationship != null) {
+            if (!relationship.has("actions")) {
+                relationship.put("actions", new JSONObject().put("invite_action_result", new JSONObject()
+                        .put("__typename", "UserCommunityInviteActionUnavailable").put("reason", "NotSupported").put("message", "")));
+            }
+            if (!relationship.has("role")) relationship.put("role", out.optString("role", "NonMember"));
+        }
+        // a community result names its community beside it
+        JSONObject communityResults = out.has("community_results") ? out.optJSONObject("community_results") : out.optJSONObject("communityResults");
+        if (communityResults != null && !communityResults.has("rest_id")) {
+            JSONObject r = communityResults.optJSONObject("result");
+            if (r != null && r.has("rest_id")) communityResults.put("rest_id", r.getString("rest_id"));
+        }
         // a post's edit state is a typed union too: an edit points at the first version
         JSONObject edit = out.optJSONObject("edit_control");
         if (edit != null && !edit.has("__typename")) {

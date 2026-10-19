@@ -226,6 +226,10 @@ final class XitterInterceptor implements Interceptor {
         if (path.endsWith("/1.1/help/settings.json")) {
             return empty(request, "{\"config\":" + FEATURE_SWITCHES + ",\"impressions\":[]}");
         }
+        // whether to show the Communities home tab's memberships; the instance has no such query
+        if (path.endsWith("/CommunitiesMembership")) {
+            return empty(request, "{\"data\":{\"viewer\":{\"hasCommunityMemberShips\":true},\"communitiesViewer\":{\"unreadIndicatorActive\":false}}}");
+        }
         if (path.endsWith("/GenerateAttestationNonce")) {
             return empty(request, "{\"data\":{\"generate_attestation_nonce\":{\"nonce\":\"eGl0dGVy\"}}}");
         }
