@@ -5,10 +5,15 @@ client of a [Xitter](https://github.com/Xittered/xitter) instance.
 
 ## Patches
 
+<!-- PATCHES_START EXPANDED -->
+<!-- Generated on release from patches-list.json; edits between these markers are replaced. -->
+
 | Patch | What it does | Options |
 | --- | --- | --- |
 | **Xitter** | Sends every X address (x.com, twitter.com, twimg.com, t.co, pscp.tv…) to the instance, translates X's OAuth signing into Xitter's session cookie + csrf header, and answers the app's sign-in screens with the instance's own sign-in. | `serverUrl` (required), `clientToken`, `blockThirdParty` (default on), `allowedHosts` |
 | **Change package name** | Renames the package, its providers, permissions and account type so the app installs next to the real X. | `packageName` (default `com.twitter.android.xitter`), `appName` (default `Xitter`) |
+
+<!-- PATCHES_END -->
 
 ### How nothing reaches X
 
