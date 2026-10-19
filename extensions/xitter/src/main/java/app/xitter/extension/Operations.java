@@ -53,6 +53,22 @@ final class Operations {
         op("BookmarkAdd", new Op("CreateBookmark", null, null));
         op("BookmarkDelete", new Op("DeleteBookmark", null, null));
 
+        // lists
+        op("ViewerListManagementTimeline", new Op("ListsManagementPageTimeline", "viewer.list_management_timeline.timeline", "viewer.timeline_response.timeline"));
+        op("ListByIdQuery", new Op("ListByRestId", null, null, "rest_id", "listId"));
+        op("ListTimeline", new Op("ListLatestTweetsTimeline", "list.tweets_timeline.timeline", "list.timeline_response.timeline", "rest_id", "listId"));
+        op("ListMembersTimelineQuery", new Op("ListMembers", "list.members_timeline.timeline", "list.timeline_response.timeline", "rest_id", "listId"));
+        op("ListSubscribersTimelineQuery", new Op("ListSubscribers", "list.subscribers_timeline.timeline", "list.timeline_response.timeline", "rest_id", "listId"));
+        op("ListCreate", new Op("CreateList", null, null));
+        op("ListUpdate", new Op("UpdateList", null, null, "list_id", "listId"));
+        op("ListDelete", new Op("DeleteList", null, null, "list_id", "listId"));
+        op("ListMemberAdd", new Op("ListAddMember", null, null, "list_id", "listId", "user_id", "userId"));
+        op("ListMemberRemove", new Op("ListRemoveMember", null, null, "list_id", "listId", "user_id", "userId"));
+        op("UserListSubscribe", new Op("ListSubscribe", null, null, "list_id", "listId"));
+        op("UserListUnsubscribe", new Op("ListUnsubscribe", null, null, "list_id", "listId"));
+        op("UserListMute", new Op("MuteList", null, null, "list_id", "listId"));
+        op("UserListUnmute", new Op("UnmuteList", null, null, "list_id", "listId"));
+
         // a post and its replies
         op("ConversationTimelineV2", new Op("TweetDetail", "threaded_conversation_with_injections_v2", "timeline_response"));
 

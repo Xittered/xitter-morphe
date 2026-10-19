@@ -198,7 +198,11 @@ final class XitterInterceptor implements Interceptor {
     static Response log(Request request, HttpUrl target, Response response, String how) {
         if (Log.isLoggable(XitterNetwork.TAG, Log.DEBUG)) {
             String query = target.encodedQuery();
-            if (query != null && query.length() > 300) query = query.substring(0, 300) + "…";
+            if (query != null && query.length() > 300) {
+                // GraphQL: the variables in full, not the long list of features
+                String vars = target.queryParameter("variables");
+                query = vars != null ? "variables=" + vars : query.substring(0, 300) + "…";
+            }
             Log.d(XitterNetwork.TAG, request.method() + " " + target.encodedPath() + (query == null ? "" : "?" + query)
                     + " -> " + response.code() + " [" + how + "]");
         }
