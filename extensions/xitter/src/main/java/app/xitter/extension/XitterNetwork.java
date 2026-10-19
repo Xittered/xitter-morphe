@@ -208,6 +208,10 @@ public final class XitterNetwork {
         }
     }
 
+    public static InputStream openInputStream(android.content.ContentResolver resolver, android.net.Uri uri) throws java.io.FileNotFoundException {
+        return ProfileMedia.openInputStream(resolver, uri);
+    }
+
     // DNS: the last line of defence. A lookup of X's hosts means something wasn't rewritten.
     public static InetAddress[] getAllByName(String host) throws UnknownHostException {
         check(host);

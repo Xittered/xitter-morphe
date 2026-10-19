@@ -47,6 +47,8 @@ final class XitterInterceptor implements Interceptor {
         HttpUrl target = x ? HttpUrl.get(XitterNetwork.rewrite(url.toString())) : url;
         // a photo sent in one request: the instance's chunked upload (MediaUpload)
         if (MediaUpload.handles(target, request)) return log(request, target, MediaUpload.handle(chain, request, target), "upload");
+        // an avatar or banner sent as the image itself: uploaded first, then saved by media_id
+        if (MediaUpload.handlesProfileImage(target, request)) return log(request, target, MediaUpload.handleProfileImage(chain, request, target), "profile image");
         // the app's GraphQL operation, and the one the instance answers for it
         String operation = null;
         if (target.encodedPath().contains("/graphql/")) {
@@ -170,8 +172,13 @@ final class XitterInterceptor implements Interceptor {
             out.removeHeader("Cookie");
             out.removeHeader("x-csrf-token");
             Session s = Session.fromAuthorization(authorization);
+            if (s != null) lastSession = s;
+            // the instance serves uploaded media only to signed-in readers, and some of the app's
+            // image loaders (profile banners) don't sign their requests: they go as the account
+            // the app is using, as a browser's would with its cookie
+            XitterNetwork.Instance i = XitterNetwork.instance();
+            if (s == null && request.url().encodedPath().startsWith(i.base + "/media/")) s = lastSession;
             if (s != null) {
-                lastSession = s;
                 out.header("Cookie", "auth_token=" + s.authToken + "; ct0=" + s.csrf);
                 out.header("x-csrf-token", s.csrf);
                 out.header("x-twitter-auth-type", "OAuth2Session");

@@ -66,7 +66,8 @@ public final class ProfileFlags {
     }
 
     private static final class Data {
-        String current = "";
+        final List<String> chosen = new ArrayList<>();
+        int max = 1;
         final List<Flag> flags = new ArrayList<>();
     }
 
@@ -110,7 +111,9 @@ public final class ProfileFlags {
         if (!m.find()) return null;
         JSONObject json = new JSONObject(m.group(1));
         Data data = new Data();
-        data.current = json.optString("flag", "");
+        // a list since accounts wear up to maxFlags flags ("a,b")
+        for (String f : json.optString("flag", "").split(",")) if (!f.trim().isEmpty()) data.chosen.add(f.trim());
+        data.max = Math.max(1, json.optInt("maxFlags", 1));
         JSONArray flags = json.optJSONArray("flags");
         for (int f = 0; flags != null && f < flags.length(); f++) {
             JSONObject o = flags.getJSONObject(f);
@@ -140,7 +143,7 @@ public final class ProfileFlags {
         box.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
 
         TextView title = new TextView(activity);
-        title.setText("Flag next to your name");
+        title.setText(data.max > 1 ? "Flags next to your name, up to " + data.max : "Flag next to your name");
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         title.setTextColor(0xFF71767B);
         box.addView(title);
@@ -182,11 +185,17 @@ public final class ProfileFlags {
             row.addView(chip, p);
             chips.add(chip);
             chip.setOnClickListener(v -> {
-                select(chips, choices, id, dp);
-                save(activity, id);
+                // "none" clears; a flag toggles, while there is room for it
+                if (id.isEmpty()) data.chosen.clear();
+                else if (data.chosen.contains(id)) data.chosen.remove(id);
+                else if (data.chosen.size() < data.max) data.chosen.add(id);
+                else if (data.max == 1) data.chosen.set(0, id);
+                else return;
+                select(chips, choices, data.chosen, dp);
+                save(activity, String.join(",", data.chosen));
             });
         }
-        select(chips, choices, data.current, dp);
+        select(chips, choices, data.chosen, dp);
 
         int at = website == null ? -1 : info.indexOfChild(website);
         info.addView(box, at < 0 ? info.getChildCount() : at + 1, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -201,11 +210,13 @@ public final class ProfileFlags {
         return id == 0 ? View.NO_ID : id;
     }
 
-    private static void select(List<View> chips, List<String> choices, String id, float dp) {
+    private static void select(List<View> chips, List<String> choices, List<String> chosen, float dp) {
         for (int c = 0; c < chips.size(); c++) {
+            String id = choices.get(c);
+            boolean on = id.isEmpty() ? chosen.isEmpty() : chosen.contains(id);
             GradientDrawable border = new GradientDrawable();
             border.setCornerRadius(6 * dp);
-            border.setStroke((int) (2 * dp), choices.get(c).equals(id) ? 0xFF1D9BF0 : 0x59808080);
+            border.setStroke((int) (2 * dp), on ? 0xFF1D9BF0 : 0x59808080);
             chips.get(c).setBackground(border);
         }
     }

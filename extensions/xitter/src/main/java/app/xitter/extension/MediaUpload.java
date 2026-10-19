@@ -15,7 +15,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * Photos: X's app uploads an image in one request, the whole file as the multipart "media" part
+ * Photos: X's app uploads a post's image in one request, the whole file as the multipart "media" part
  * and no command (the older "simple" upload). The instance takes the web client's chunked
  * upload (INIT, APPEND, FINALIZE), so the one request is made those three here; the app gets
  * FINALIZE's answer, the media id it attaches to the post.
@@ -37,40 +37,85 @@ final class MediaUpload {
         MediaType type = request.body().contentType();
         String boundary = type == null ? null : type.parameter("boundary");
         byte[] body = Bodies.read(request.body());
-        Part media = boundary == null ? null : mediaPart(body, boundary);
+        Part media = boundary == null ? null : part(body, boundary, "media");
         if (media == null) return chain.proceed(request.newBuilder().url(target).build());
+        Uploaded up = upload(chain, request, target.newBuilder().query(null).build(), media.data, media.type, "tweet_image");
+        return up.response;
+    }
 
-        HttpUrl base = target.newBuilder().query(null).build();
-        // INIT: the file's size and type
+    /**
+     * An avatar or banner: X's app sends the image itself to update_profile_image.json or
+     * update_profile_banner.json (as "image" or "banner"); the instance takes the media_id of an
+     * upload, as the web client sends it. When the image was picked as a GIF, the GIF is uploaded
+     * (ProfileMedia), so it stays animated.
+     */
+    static boolean handlesProfileImage(HttpUrl url, Request request) {
+        if (!"POST".equals(request.method()) || request.body() == null) return false;
+        String path = url.encodedPath();
+        if (!path.endsWith("/account/update_profile_image.json") && !path.endsWith("/account/update_profile_banner.json")) return false;
+        MediaType type = request.body().contentType();
+        return type != null && "multipart".equals(type.type());
+    }
+
+    static Response handleProfileImage(Interceptor.Chain chain, Request request, HttpUrl target) throws IOException {
+        MediaType type = request.body().contentType();
+        String boundary = type == null ? null : type.parameter("boundary");
+        byte[] body = Bodies.read(request.body());
+        boolean banner = target.encodedPath().endsWith("/update_profile_banner.json");
+        Part image = boundary == null ? null : part(body, boundary, banner ? "banner" : "image");
+        if (image == null) return chain.proceed(request.newBuilder().url(target).build());
+        byte[] gif = ProfileMedia.takeRecentGif();
+        byte[] data = gif != null ? gif : image.data;
+        String mime = gif != null ? "image/gif" : image.type;
+        String path = target.encodedPath();
+        HttpUrl upload = target.newBuilder().encodedPath(path.substring(0, path.lastIndexOf("/account/")) + "/media/upload.json").query(null).build();
+        Uploaded up = upload(chain, request, upload, data, mime, gif != null ? "tweet_gif" : "tweet_image");
+        if (up.mediaId == null) return up.response;
+        up.response.close();
+        RequestBody form = new okhttp3.FormBody.Builder().add("media_id", up.mediaId).build();
+        return chain.proceed(request.newBuilder().url(target).post(form).build());
+    }
+
+    private static final class Uploaded {
+        final Response response;
+        final String mediaId;
+
+        Uploaded(Response response, String mediaId) {
+            this.response = response;
+            this.mediaId = mediaId;
+        }
+    }
+
+    // the instance's chunked upload of one file: INIT, APPEND (one segment), FINALIZE
+    private static Uploaded upload(Interceptor.Chain chain, Request request, HttpUrl base, byte[] data, String type, String category) throws IOException {
         Response init = chain.proceed(request.newBuilder().url(base.newBuilder()
                 .addQueryParameter("command", "INIT")
-                .addQueryParameter("total_bytes", String.valueOf(media.data.length))
-                .addQueryParameter("media_type", media.type)
-                .addQueryParameter("media_category", "tweet_image")
+                .addQueryParameter("total_bytes", String.valueOf(data.length))
+                .addQueryParameter("media_type", type)
+                .addQueryParameter("media_category", category)
                 .build()).post(RequestBody.create(new byte[0], null)).build());
-        if (!init.isSuccessful() || init.body() == null) return init;
+        if (!init.isSuccessful() || init.body() == null) return new Uploaded(init, null);
         String id;
         try {
             id = new JSONObject(init.body().string()).getString("media_id_string");
         } catch (JSONException e) {
             throw new IOException("media upload: no media id", e);
         }
-        // APPEND: the file, in one segment
         RequestBody file = new MultipartBody.Builder().setType(MultipartBody.FORM)
-                .addFormDataPart("media", "blob", RequestBody.create(media.data, MediaType.parse(media.type)))
+                .addFormDataPart("media", "blob", RequestBody.create(data, MediaType.parse(type)))
                 .build();
         Response append = chain.proceed(request.newBuilder().url(base.newBuilder()
                 .addQueryParameter("command", "APPEND")
                 .addQueryParameter("media_id", id)
                 .addQueryParameter("segment_index", "0")
                 .build()).post(file).build());
-        if (!append.isSuccessful()) return append;
+        if (!append.isSuccessful()) return new Uploaded(append, null);
         append.close();
-        // FINALIZE: its answer is what the app reads
-        return chain.proceed(request.newBuilder().url(base.newBuilder()
+        Response finalize = chain.proceed(request.newBuilder().url(base.newBuilder()
                 .addQueryParameter("command", "FINALIZE")
                 .addQueryParameter("media_id", id)
                 .build()).post(RequestBody.create(new byte[0], null)).build());
+        return new Uploaded(finalize, finalize.isSuccessful() ? id : null);
     }
 
     private static final class Part {
@@ -83,8 +128,8 @@ final class MediaUpload {
         }
     }
 
-    // the "media" part of a multipart body: its content type and bytes
-    private static Part mediaPart(byte[] body, String boundary) {
+    // a named part of a multipart body: its content type and bytes
+    private static Part part(byte[] body, String boundary, String name) {
         byte[] delimiter = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
         int at = indexOf(body, delimiter, 0);
         while (at >= 0) {
@@ -94,7 +139,7 @@ final class MediaUpload {
             int next = indexOf(body, ("\r\n--" + boundary).getBytes(StandardCharsets.ISO_8859_1), headersEnd + 4);
             if (next < 0) return null;
             String headers = new String(body, headersStart, headersEnd - headersStart, StandardCharsets.ISO_8859_1);
-            if (headers.contains("name=\"media\"")) {
+            if (headers.contains("name=\"" + name + "\"")) {
                 String type = "application/octet-stream";
                 for (String line : headers.split("\r\n")) {
                     if (line.regionMatches(true, 0, "Content-Type:", 0, 13)) type = line.substring(13).split(";")[0].trim();

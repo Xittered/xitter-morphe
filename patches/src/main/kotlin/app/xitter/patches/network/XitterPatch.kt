@@ -295,6 +295,53 @@ val xitterPatch = bytecodePatch(
             println("Xitter: profile header shows badges for every account (${returns.size})")
         }
 
+        // Animated images play, as in a browser: the instance serves GIFs as images (posts, and
+        // animated avatars and banners). The app's image requests decode with forceStaticImage
+        // (the decode options its Fresco request helper builds once, ImageDecodeOptionsBuilder's
+        // only boolean), and Fresco only starts an animation when the controller builder
+        // (AbstractDraweeControllerBuilder) has autoPlayAnimations, its only boolean, set.
+        var animated = 0
+        val requests = mutableClassDefByOrNull("Lcom/twitter/media/ui/fresco/util/a;")
+        val clinit = requests?.methods?.firstOrNull { it.name == "<clinit>" }
+        clinit?.implementation?.instructions?.withIndex()?.filter {
+            it.value.opcode == Opcode.IPUT_BOOLEAN &&
+                ((it.value as ReferenceInstruction).reference as com.android.tools.smali.dexlib2.iface.reference.FieldReference).definingClass == "Lcom/facebook/imagepipeline/common/d;"
+        }?.map { it.index to (it.value as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA }
+            ?.reversed()?.forEach { (at, register) ->
+                clinit.addInstruction(at, "const/4 v$register, 0x0")
+                animated++
+            }
+        val builder = mutableClassDefByOrNull("Lcom/facebook/drawee/controller/b;")
+        val autoPlay = builder?.fields?.filter { it.type == "Z" && !AccessFlags.STATIC.isSet(it.accessFlags) }?.singleOrNull()
+        val build = builder?.methods?.firstOrNull {
+            it.parameterTypes.isEmpty() && it.returnType == "Lcom/facebook/drawee/controller/a;" && it.implementation != null
+        }
+        if (autoPlay != null && build != null && build.implementation!!.registerCount >= 2) {
+            build.addInstructions(
+                0,
+                """
+                    const/4 v0, 0x1
+                    iput-boolean v0, p0, ${builder.type}->${autoPlay.name}:Z
+                """,
+            )
+            animated++
+        }
+        println("Xitter: animated images " + if (animated == 2) "play" else "stay still ($animated of 2 changes)")
+        // ...and rounded ones (avatars) keep their shape when animated (AnimatedRounding): the
+        // image view's rounding method, which reads the corner radii it sets ("getCornerRadii")
+        val drawee = mutableClassDefByOrNull("Lcom/twitter/media/ui/fresco/FrescoDraweeView;")
+        val rounding = drawee?.methods?.firstOrNull { m ->
+            m.parameterTypes.isEmpty() && m.returnType == "V" && m.implementation?.instructions?.any {
+                (it.opcode == Opcode.INVOKE_VIRTUAL || it.opcode == Opcode.INVOKE_INTERFACE) && ((it as ReferenceInstruction).reference as MethodReference).name == "getTopLeftRadius"
+            } == true
+        }
+        if (rounding == null) {
+            println("Xitter: image rounding not found, animated avatars stay square")
+        } else {
+            rounding.addInstruction(0, "invoke-static {p0}, ${EXTENSION_PACKAGE}AnimatedRounding;->clip(Landroid/view/View;)V")
+            println("Xitter: animated avatars keep their shape")
+        }
+
         // 4. Everything else that opens connections or resolves hosts.
         redirectPlatformCalls()
     }
@@ -338,6 +385,8 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
         Redirect(::isWebView, "loadUrl", listOf("Ljava/lang/String;"), "V", static = false),
         Redirect(::isWebView, "loadUrl", listOf("Ljava/lang/String;", "Ljava/util/Map;"), "V", static = false),
         Redirect(::isWebView, "postUrl", listOf("Ljava/lang/String;", "[B"), "V", static = false),
+        // files picked on the device (an animated avatar or banner is uploaded as it was picked)
+        Redirect({ it == "Landroid/content/ContentResolver;" }, "openInputStream", listOf("Landroid/net/Uri;"), "Ljava/io/InputStream;", static = false, receiver = "Landroid/content/ContentResolver;"),
         // links handed to other apps
         Redirect(::isContext, "startActivity", listOf("Landroid/content/Intent;"), "V", static = false, receiver = CONTEXT),
         Redirect(::isContext, "startActivity", listOf("Landroid/content/Intent;", "Landroid/os/Bundle;"), "V", static = false, receiver = CONTEXT),
