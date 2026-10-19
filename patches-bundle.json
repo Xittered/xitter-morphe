@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-19T12:16:01",
-  "description": "## [1.1.0-dev.2](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.1...v1.1.0-dev.2) (2026-10-19)\n\n### 🐛 Bug Fixes\n\n* keep X and instance links in the app; send other X links to the instance ([ba18c13](https://github.com/jakeayy/xitter-morphe/commit/ba18c138cd454505b133f36b92e4392100f321d2))\n\n### ✨ New Features\n\n* notifications tab from the instance's GraphQL timeline ([1dcbc82](https://github.com/jakeayy/xitter-morphe/commit/1dcbc8292102d3295ab18759d360730c3da0affc))\n* profiles, post detail, posting and replies ([e52e6ec](https://github.com/jakeayy/xitter-morphe/commit/e52e6ece4dfc4f754532967a08ac7d46d8b51ffd))",
-  "download_url": "https://github.com/jakeayy/xitter-morphe/releases/download/v1.1.0-dev.2/patches-1.1.0-dev.2.mpp",
+  "created_at": "2026-10-19T12:43:50",
+  "description": "## [1.1.0-dev.3](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.2...v1.1.0-dev.3) (2026-10-19)\n\n### 🐛 Bug Fixes\n\n* home/notifications loop; viewer query ([ca4037b](https://github.com/jakeayy/xitter-morphe/commit/ca4037bff1fa878f63e39c08548bc1e5ea0ac19c))\n\n### ✨ New Features\n\n* profile replies, media and likes tabs, followers and following ([f26fb36](https://github.com/jakeayy/xitter-morphe/commit/f26fb366749d8b84d34345d6bffc393901b9c378))\n* search, through the same REST-to-GraphQL timeline conversion ([2c94734](https://github.com/jakeayy/xitter-morphe/commit/2c9473406c4e54db802d5525aabb26211f9c92c8))",
+  "download_url": "https://github.com/jakeayy/xitter-morphe/releases/download/v1.1.0-dev.3/patches-1.1.0-dev.3.mpp",
   "signature_download_url": "",
-  "version": "1.1.0-dev.2"
+  "version": "1.1.0-dev.3"
 }

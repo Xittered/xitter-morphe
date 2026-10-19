@@ -1,3 +1,14 @@
+## [1.1.0-dev.3](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.2...v1.1.0-dev.3) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+* home/notifications loop; viewer query ([ca4037b](https://github.com/jakeayy/xitter-morphe/commit/ca4037bff1fa878f63e39c08548bc1e5ea0ac19c))
+
+### ✨ New Features
+
+* profile replies, media and likes tabs, followers and following ([f26fb36](https://github.com/jakeayy/xitter-morphe/commit/f26fb366749d8b84d34345d6bffc393901b9c378))
+* search, through the same REST-to-GraphQL timeline conversion ([2c94734](https://github.com/jakeayy/xitter-morphe/commit/2c9473406c4e54db802d5525aabb26211f9c92c8))
+
 ## [1.1.0-dev.2](https://github.com/jakeayy/xitter-morphe/compare/v1.1.0-dev.1...v1.1.0-dev.2) (2026-10-19)
 
 ### 🐛 Bug Fixes
