@@ -13,61 +13,98 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * The notifications tab. X's classic app reads it from REST (/2/notifications/all.json and
- * friends) in the older timeline format: the timeline only names notifications, posts and users
- * by id, and they come separately in "globalObjects". The instance answers the web client's
- * GraphQL NotificationsTimeline, where each item carries them inline; the answer is asked for
- * with the same session and turned into the older format here.
+ * Screens X's classic app reads from REST in the older timeline format (the notifications tab,
+ * search): the timeline only names notifications, posts and users by id, and they come
+ * separately in "globalObjects". The instance answers the web client's GraphQL timelines, where
+ * each item carries them inline; the GraphQL answer is asked for with the same session and
+ * turned into the older format here.
  */
-final class Notifications {
-    private Notifications() {}
+final class V2Timelines {
+    private V2Timelines() {}
 
-    /** The tab's GraphQL timeline type for one of the REST paths, or null if it isn't one. */
-    static String timelineType(String path) {
-        switch (path) {
-            case "/2/notifications/all.json": return "All";
-            case "/2/notifications/mentions.json": return "Mentions";
-            case "/2/notifications/verified.json": return "Verified";
-            default: return null;
+    /** The GraphQL request one of these REST requests stands for, or null if it isn't one. */
+    static Source source(HttpUrl target) {
+        String path = target.encodedPath();
+        try {
+            switch (path) {
+                case "/2/notifications/all.json": return notifications(target, "All");
+                case "/2/notifications/mentions.json": return notifications(target, "Mentions");
+                case "/2/notifications/verified.json": return notifications(target, "Verified");
+                case "/2/search/adaptive.json": return search(target);
+                default: return null;
+            }
+        } catch (JSONException e) {
+            return null;
         }
     }
 
-    static Response handle(Interceptor.Chain chain, Request request, HttpUrl target, String type) throws IOException {
-        JSONObject vars = new JSONObject();
-        try {
-            vars.put("timeline_type", type);
-            String count = target.queryParameter("count");
-            vars.put("count", count != null ? Integer.parseInt(count) : 40);
-            String cursor = target.queryParameter("cursor");
-            if (cursor != null) vars.put("cursor", cursor);
-        } catch (JSONException | NumberFormatException e) {
-            throw new IOException(e);
+    static final class Source {
+        final String operation;
+        final JSONObject variables;
+        /** where the timeline (with "instructions") is, under "data" */
+        final String[] path;
+
+        Source(String operation, JSONObject variables, String path) {
+            this.operation = operation;
+            this.variables = variables;
+            this.path = path.split("\\.");
         }
+    }
+
+    private static JSONObject paging(HttpUrl target, int count) throws JSONException {
+        JSONObject vars = new JSONObject();
+        String c = target.queryParameter("count");
+        try {
+            vars.put("count", c != null ? Integer.parseInt(c) : count);
+        } catch (NumberFormatException e) {
+            vars.put("count", count);
+        }
+        String cursor = target.queryParameter("cursor");
+        if (cursor != null) vars.put("cursor", cursor);
+        return vars;
+    }
+
+    private static Source notifications(HttpUrl target, String type) throws JSONException {
+        return new Source("NotificationsTimeline", paging(target, 40).put("timeline_type", type),
+                "viewer_v2.user_results.result.notification_timeline.timeline");
+    }
+
+    private static Source search(HttpUrl target) throws JSONException {
+        String filter = target.queryParameter("result_filter"), mode = target.queryParameter("tweet_search_mode");
+        String product = "user".equals(filter) ? "People"
+                : ("image".equals(filter) || "video".equals(filter) || "media".equals(filter)) ? "Media"
+                : "live".equals(mode) ? "Latest" : "Top";
+        String q = target.queryParameter("q");
+        return new Source("SearchTimeline", paging(target, 20).put("rawQuery", q == null ? "" : q).put("product", product)
+                .put("querySource", "typed_query"), "search_by_raw_query.search_timeline.timeline");
+    }
+
+    static Response handle(Interceptor.Chain chain, Request request, HttpUrl target, Source source) throws IOException {
         HttpUrl graphql = target.newBuilder()
-                .encodedPath("/graphql/xitter/NotificationsTimeline")
+                .encodedPath("/graphql/xitter/" + source.operation)
                 .query(null)
-                .addQueryParameter("variables", vars.toString())
+                .addQueryParameter("variables", source.variables.toString())
                 .build();
         // the same request otherwise: its OAuth header is turned into the session (Auth)
         Response response = chain.proceed(request.newBuilder().url(graphql).get().header("Accept-Encoding", "identity").build());
         if (!response.isSuccessful() || response.body() == null) return response;
         String body = response.body().string();
         try {
-            String v2 = toV2(new JSONObject(Shapes.reshape("NotificationsTimeline", body)));
+            String v2 = toV2(new JSONObject(Shapes.reshape(source.operation, body)), source.path);
             return XitterInterceptor.json(request, 200, v2);
         } catch (JSONException e) {
-            throw new IOException("could not convert notifications", e);
+            throw new IOException("could not convert " + source.operation, e);
         }
     }
 
     // ---- GraphQL timeline -> REST timeline + globalObjects ----
 
-    private static String toV2(JSONObject graphql) throws JSONException {
-        JSONObject timeline = graphql.getJSONObject("data").getJSONObject("viewer_v2").getJSONObject("user_results")
-                .getJSONObject("result").getJSONObject("notification_timeline");
+    private static String toV2(JSONObject graphql, String[] path) throws JSONException {
+        JSONObject timeline = graphql.getJSONObject("data");
+        for (String k : path) timeline = timeline.getJSONObject(k);
         JSONObject users = new JSONObject(), tweets = new JSONObject(), notifications = new JSONObject();
         JSONArray instructions = new JSONArray();
-        JSONArray in = timeline.getJSONObject("timeline").getJSONArray("instructions");
+        JSONArray in = timeline.getJSONArray("instructions");
         for (int i = 0; i < in.length(); i++) {
             JSONObject ins = in.getJSONObject(i);
             String type = ins.optString("__typename", ins.optString("type"));
@@ -96,7 +133,7 @@ final class Notifications {
         JSONObject globals = new JSONObject().put("users", users).put("tweets", tweets).put("notifications", notifications);
         return new JSONObject()
                 .put("globalObjects", globals)
-                .put("timeline", new JSONObject().put("id", timeline.optString("id", "notifications")).put("instructions", instructions))
+                .put("timeline", new JSONObject().put("id", timeline.optString("id", "timeline")).put("instructions", instructions))
                 .toString();
     }
 
@@ -109,31 +146,64 @@ final class Notifications {
                     .put("value", content.optString("value"))
                     .put("cursorType", content.optString("cursorType", content.optString("cursor_type")))));
         } else if (kind.equals("TimelineTimelineItem")) {
-            JSONObject item = content.has("content") ? content.getJSONObject("content") : content.optJSONObject("itemContent");
+            JSONObject item = item(content, users, tweets, notifications);
             if (item == null) return null;
-            JSONObject itemContent;
-            String itemType = item.optString("__typename");
-            if (itemType.equals("TimelineNotification")) {
+            out = new JSONObject().put("item", item);
+        } else if (kind.equals("TimelineTimelineModule")) {
+            JSONArray items = new JSONArray();
+            JSONArray from = content.optJSONArray("items");
+            for (int i = 0; from != null && i < from.length(); i++) {
+                JSONObject moduleItem = from.getJSONObject(i);
+                JSONObject item = item(moduleItem.optJSONObject("item"), users, tweets, notifications);
+                if (item != null) items.put(new JSONObject().put("entryId", moduleItem.optString("entryId")).put("item", item));
+            }
+            if (items.length() == 0) return null;
+            JSONObject module = new JSONObject().put("items", items).put("displayType", content.optString("displayType", "Vertical"));
+            if (content.has("header")) module.put("header", content.get("header"));
+            if (content.has("footer")) module.put("footer", content.get("footer"));
+            if (content.has("clientEventInfo")) module.put("clientEventInfo", content.get("clientEventInfo"));
+            out = new JSONObject().put("timelineModule", module);
+        } else {
+            return null;
+        }
+        return new JSONObject().put("entryId", entry.getString("entryId")).put("sortIndex", entry.getString("sortIndex")).put("content", out);
+    }
+
+    /** A timeline item (or module item) with its object moved to globalObjects. */
+    private static JSONObject item(JSONObject holder, JSONObject users, JSONObject tweets, JSONObject notifications) throws JSONException {
+        if (holder == null) return null;
+        JSONObject item = holder.has("content") ? holder.getJSONObject("content") : holder.optJSONObject("itemContent");
+        if (item == null) return null;
+        JSONObject itemContent;
+        switch (item.optString("__typename")) {
+            case "TimelineNotification": {
                 String id = item.getString("id");
                 notifications.put(id, notification(item, users, tweets));
                 JSONObject n = new JSONObject().put("id", id);
                 if (item.has("notification_url")) n.put("url", item.get("notification_url"));
                 itemContent = new JSONObject().put("notification", n);
-            } else if (itemType.equals("TimelineTweet")) {
+                break;
+            }
+            case "TimelineTweet": {
                 JSONObject results = item.has("tweetResult") ? item.getJSONObject("tweetResult") : item.optJSONObject("tweet_results");
                 String id = addTweet(results, users, tweets);
                 if (id == null) return null;
                 itemContent = new JSONObject().put("tweet", new JSONObject().put("id", id).put("displayType", "Tweet"));
-            } else {
-                return null;
+                break;
             }
-            JSONObject wrapped = new JSONObject().put("content", itemContent);
-            if (content.has("clientEventInfo")) wrapped.put("clientEventInfo", content.get("clientEventInfo"));
-            out = new JSONObject().put("item", wrapped);
-        } else {
-            return null;
+            case "TimelineUser": {
+                JSONObject results = item.has("userResult") ? item.getJSONObject("userResult") : item.optJSONObject("user_results");
+                String id = addUser(results, users);
+                if (id == null) return null;
+                itemContent = new JSONObject().put("user", new JSONObject().put("id", id).put("displayType", "User"));
+                break;
+            }
+            default:
+                return null;
         }
-        return new JSONObject().put("entryId", entry.getString("entryId")).put("sortIndex", entry.getString("sortIndex")).put("content", out);
+        JSONObject wrapped = new JSONObject().put("content", itemContent);
+        if (holder.has("clientEventInfo")) wrapped.put("clientEventInfo", holder.get("clientEventInfo"));
+        return wrapped;
     }
 
     private static JSONObject notification(JSONObject item, JSONObject users, JSONObject tweets) throws JSONException {
