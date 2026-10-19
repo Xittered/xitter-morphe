@@ -91,11 +91,11 @@ translates on the device, so the instance needs no changes:
 
 Tested on a device against an unmodified Xitter server: sign-in, home (For you, Following),
 profiles (posts, replies, media, likes, followers, following), post detail, posting and replies,
-likes, bookmarks, notifications, search (top, latest, people, media), lists, links (in-app or to
-the instance; X pages are never loaded).
+likes, bookmarks, notifications, search (top, latest, people, media), Explore (trends), lists,
+links (in-app or to the instance; X pages are never loaded).
 
-Not working yet: chat (needs the instance's Juicebox realm; untested), communities, Explore,
-most settings screens. Accounts with two-factor sign-in can't sign in from the app.
+Not working yet: chat (needs the instance's Juicebox realm; untested), communities, most
+settings screens. Accounts with two-factor sign-in can't sign in from the app.
 
 ## Debugging
 
