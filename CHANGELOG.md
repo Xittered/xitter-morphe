@@ -1,3 +1,9 @@
+## [1.1.0-dev.12](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.11...v1.1.0-dev.12) (2026-10-19)
+
+### ✨ New Features
+
+* animated avatars and banners, multi-flag picker, avatar and banner saving ([0fd98dc](https://github.com/Xittered/xitter-morphe/commit/0fd98dc209916893d01c1269029c17e2015b1f03))
+
 ## [1.1.0-dev.11](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.10...v1.1.0-dev.11) (2026-10-19)
 
 ### ✨ New Features
