@@ -14,6 +14,7 @@ import app.xitter.patches.shared.Constants.COMPATIBILITY_X
 import app.xitter.patches.shared.Constants.CONFIG_CLASS
 import app.xitter.patches.shared.Constants.EXTENSION_PACKAGE
 import app.xitter.patches.shared.Constants.NETWORK_CLASS
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc
@@ -185,6 +186,40 @@ val xitterPatch = bytecodePatch(
             }
         }
 
+        // The classic app, not X Lite: X Lite (com.x.android.*) reads GraphQL through Apollo
+        // documents with aliases and the schema's own field names, which nothing on the instance
+        // answers; the classic screens read the same timeline format as the web client. Every
+        // yes/no question of the X Lite gate (com.twitter.x.lite.featureswitches.n) is answered no.
+        val gate = classDefByOrNull("Lcom/twitter/x/lite/featureswitches/n;")
+            ?: throw PatchException("X Lite gate not found")
+        val questions = gate.methods.filter { it.returnType == "Z" }.map { it.name to it.parameterTypes.map { p -> p.toString() } }.toSet()
+        var answered = 0
+        classDefForEach { c ->
+            if (gate.type !in c.interfaces) return@classDefForEach
+            mutableClassDefBy(c).methods
+                .filter { it.implementation != null && it.returnType == "Z" && (it.name to it.parameterTypes.map { p -> p.toString() }) in questions }
+                .forEach {
+                    it.addInstructions(0, "const/4 v0, 0x0\nreturn v0")
+                    answered++
+                }
+        }
+        println("Xitter: X Lite gate answered no in $answered methods")
+
+        // Errors X recovers from go to its crash service (blocked); XitterDebug can log them. The
+        // reporter's methods are obfuscated, so it is found by shape and skipped if it changed.
+        val reporter = mutableClassDefByOrNull("Lcom/twitter/util/errorreporter/e;")
+        var hooked = 0
+        reporter?.methods?.forEach {
+            val params = it.parameterTypes.map { p -> p.toString() }
+            if (it.returnType != "V" || it.implementation == null) return@forEach
+            val register = if (AccessFlags.STATIC.isSet(it.accessFlags)) "p0" else "p1"
+            if (params == listOf("Lcom/twitter/util/errorreporter/c;", "Z") || params == listOf("Ljava/lang/Throwable;")) {
+                it.addInstruction(0, "invoke-static {$register}, ${EXTENSION_PACKAGE}XitterDebug;->report(Ljava/lang/Object;)V")
+                hooked++
+            }
+        }
+        println("Xitter: error reporter " + if (hooked > 0) "hooked ($hooked entry points)" else "not found, not hooked")
+
         // 4. Everything else that opens connections or resolves hosts.
         redirectPlatformCalls()
     }
@@ -260,7 +295,7 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
             }
         }
     }
-    Logger.getLogger("Xitter").info("Routed $count network calls in ${targets.size} classes through the Xitter guard")
+    println("Xitter: routed $count network calls in ${targets.size} classes through the Xitter guard")
 }
 
 private fun Method.isVariantGetter() =

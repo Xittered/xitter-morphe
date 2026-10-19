@@ -8,8 +8,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -20,12 +18,10 @@ import java.util.concurrent.TimeUnit;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
-import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 
 /**
@@ -91,8 +87,11 @@ final class LoginShim {
         }
 
         if (flowToken.startsWith(PREFIX + "done")) {
-            // the app confirms the opened account; the flow ends here
-            return flow(request, PREFIX + "done", new JSONArray());
+            // the app confirms the opened account; the flow ends on the home timeline (with no
+            // subtask left the sign-in screen just closes, and the app with it)
+            JSONObject home = new JSONObject().put("next_link", link("finish", "next_link", null));
+            return flow(request, PREFIX + "end", new JSONArray().put(
+                    new JSONObject().put("subtask_id", "XitterOpenHome").put("open_home_timeline", home)));
         }
 
         return flow(request, PREFIX + "start", usernameScreen());
@@ -112,8 +111,10 @@ final class LoginShim {
                 .build();
         String authToken = null, csrf = null, userId = null;
         try (Response r = client.newCall(login).execute()) {
-            if (r.code() == 401) return error(request, 399, "Wrong username or password.");
-            if (r.code() == 429) return error(request, 88, "Too many tries. Wait a few minutes and try again.");
+            // back to the start, where a mistyped username can be fixed (the password screen
+            // has no way back)
+            if (r.code() == 401) return flow(request, PREFIX + "start", usernameScreen("Wrong username or password. Try again."));
+            if (r.code() == 429) return flow(request, PREFIX + "start", usernameScreen("Too many tries. Wait a few minutes and try again."));
             for (String c : r.headers("Set-Cookie")) {
                 String pair = c.split(";", 2)[0];
                 int eq = pair.indexOf('=');
@@ -188,10 +189,14 @@ final class LoginShim {
     // ---- the screens ----
 
     private static JSONArray usernameScreen() throws JSONException {
+        return usernameScreen(null);
+    }
+
+    private static JSONArray usernameScreen(String problem) throws JSONException {
         String name = XitterNetwork.instance().host;
         JSONObject enterText = new JSONObject()
                 .put("primary_text", text("Sign in to " + name))
-                .put("secondary_text", text("Enter your username on this Xitter instance."))
+                .put("secondary_text", text(problem != null ? problem : "Enter your username on this Xitter instance."))
                 .put("hint_text", "Username")
                 .put("multiline", false)
                 .put("auto_correction_enabled", false)
@@ -202,6 +207,7 @@ final class LoginShim {
     private static JSONArray passwordScreen(String username) throws JSONException {
         JSONObject enterPassword = new JSONObject()
                 .put("primary_text", text("Enter your password"))
+                .put("secondary_text", text("Signing in as @" + username + " on " + XitterNetwork.instance().host + "."))
                 .put("hint", "Password")
                 .put("name", "@" + username)
                 // signing in, not choosing a password: no strength check against the server
@@ -241,32 +247,10 @@ final class LoginShim {
 
     // ---- helpers ----
 
-    /**
-     * The request's JSON. X's build renames okio (okio.Buffer is not there), so the body is
-     * read with OkHttp's own API: an empty ResponseBody's source is an okio Buffer, which is
-     * also a sink; the body is written into it and read back as another ResponseBody.
-     */
     private static JSONObject readBody(RequestBody body) {
         if (body == null) return new JSONObject();
         try {
-            // source() and its okio return type are called by name: the compiled reference would
-            // name okio.BufferedSource, which the app doesn't have under that name
-            ResponseBody empty = ResponseBody.create(new byte[0], null);
-            Object buffer = ResponseBody.class.getMethod("source").invoke(empty);
-            Method writeTo = null;
-            for (Method m : RequestBody.class.getMethods()) {
-                if (m.getName().equals("writeTo") && m.getParameterTypes().length == 1
-                        && m.getParameterTypes()[0].isInstance(buffer)) writeTo = m;
-            }
-            Method wrap = null;
-            for (Method m : ResponseBody.class.getMethods()) {
-                Class<?>[] p = m.getParameterTypes();
-                if (Modifier.isStatic(m.getModifiers()) && m.getName().equals("create") && p.length == 3
-                        && p[0].isInstance(buffer) && p[1] == MediaType.class && p[2] == long.class) wrap = m;
-            }
-            if (writeTo == null || wrap == null) throw new IllegalStateException("no okio buffer");
-            writeTo.invoke(body, buffer);
-            String s = ((ResponseBody) wrap.invoke(null, buffer, null, -1L)).string();
+            String s = new String(Bodies.read(body), StandardCharsets.UTF_8);
             return s.isEmpty() ? new JSONObject() : new JSONObject(s);
         } catch (Throwable e) {
             Log.w(TAG, "could not read the sign-in request", e);

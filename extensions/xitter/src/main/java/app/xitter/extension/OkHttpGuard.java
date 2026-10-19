@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 
 import okhttp3.CertificatePinner;
+import okhttp3.ConnectionSpec;
 import okhttp3.CookieJar;
 import okhttp3.Dns;
 import okhttp3.Interceptor;
@@ -39,6 +40,11 @@ final class OkHttpGuard {
         builder.proxySelector(new GuardProxySelector(ProxySelector.getDefault()));
         // sessions are sent by XitterInterceptor.Auth; a cookie jar would overwrite them
         builder.cookieJar(CookieJar.NO_COOKIES);
+
+        // an instance on plain http (a LAN or dev server): X's clients allow only TLS
+        if ("http".equals(XitterNetwork.instance().scheme)) {
+            builder.connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS, ConnectionSpec.CLEARTEXT));
+        }
 
         // the system's trust store and hostname checks instead of X's
         builder.setSslSocketFactoryOrNull$okhttp(null);

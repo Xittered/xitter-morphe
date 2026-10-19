@@ -45,12 +45,69 @@ final class XitterInterceptor implements Interceptor {
         if (local != null) return log(request, url, local, "local");
 
         HttpUrl target = x ? HttpUrl.get(XitterNetwork.rewrite(url.toString())) : url;
-        Request out = request.newBuilder().url(target).build();
+        // the app's GraphQL operation, and the one the instance answers for it
+        String operation = null;
+        if (target.encodedPath().contains("/graphql/")) {
+            java.util.List<String> segments = target.pathSegments();
+            operation = segments.get(segments.size() - 1);
+            String server = Operations.serverName(operation);
+            if (!server.equals(operation)) target = target.newBuilder().setPathSegment(segments.size() - 1, server).build();
+        }
+        // what the instance reads: uncompressed bodies
+        request = Bodies.uncompressed(request);
+        Request.Builder rewritten = request.newBuilder().url(target);
+        boolean graphql = target.encodedPath().contains("/graphql/");
+        // GraphQL answers are reshaped (Shapes), so they must be readable here: gzip, not
+        // the brotli X asks for; the debug log wants them plain
+        if (Log.isLoggable(XitterNetwork.TAG + "Body", Log.DEBUG)) rewritten.header("Accept-Encoding", "identity");
+        else if (graphql) rewritten.header("Accept-Encoding", "gzip");
+        Request out = rewritten.build();
 
         // X's sign-in and sign-up screens, answered on the device with the instance's sign-in
         if (LoginShim.handles(url)) return LoginShim.handle(chain, request, out);
 
-        return chain.proceed(out);
+        Response response;
+        try {
+            response = chain.proceed(out);
+        } catch (IOException e) {
+            if (Log.isLoggable(XitterNetwork.TAG, Log.DEBUG)) Log.d(XitterNetwork.TAG, out.method() + " " + target.encodedPath() + " failed: " + e);
+            throw e;
+        }
+        if (graphql) response = reshaped(operation, response);
+        return logBody(target, response);
+    }
+
+    private static Response reshaped(String operation, Response response) throws IOException {
+        ResponseBody body = response.body();
+        MediaType type = body == null ? null : body.contentType();
+        if (body == null || type == null || !"json".equals(type.subtype())) return response;
+        byte[] bytes = body.bytes();
+        if ("gzip".equalsIgnoreCase(response.header("Content-Encoding"))) bytes = Bodies.gunzip(bytes);
+        String json = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            json = Shapes.reshape(operation, json);
+        } catch (Exception e) {
+            Log.w(XitterNetwork.TAG, "could not reshape " + response.request().url().encodedPath(), e);
+        }
+        return response.newBuilder()
+                .removeHeader("Content-Encoding")
+                .removeHeader("Content-Length")
+                .body(ResponseBody.create(json, type))
+                .build();
+    }
+
+    // adb shell setprop log.tag.XitterBody DEBUG: the start of each response, decompressed
+    private static Response logBody(HttpUrl target, Response response) {
+        if (Log.isLoggable(XitterNetwork.TAG + "Body", Log.DEBUG)) {
+            try {
+                Request q = response.request();
+                Log.d(XitterNetwork.TAG + "Body", target.encodedPath() + " accept=" + q.header("Accept") + " accept-encoding=" + q.header("Accept-Encoding")
+                        + " type=" + response.header("Content-Type") + " encoding=" + response.header("Content-Encoding")
+                        + " " + response.peekBody(4000).string());
+            } catch (IOException ignored) {
+            }
+        }
+        return response;
     }
 
     /**
