@@ -1,3 +1,9 @@
+## [1.1.0-dev.5](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.4...v1.1.0-dev.5) (2026-10-19)
+
+### ✨ New Features
+
+* Explore (trends) from the instance's ExplorePage ([c8d7d7a](https://github.com/Xittered/xitter-morphe/commit/c8d7d7a8e7b01b4fee5256ef52544e9991f02c73))
+
 ## [1.1.0-dev.4](https://github.com/Xittered/xitter-morphe/compare/v1.1.0-dev.3...v1.1.0-dev.4) (2026-10-19)
 
 ### ✨ New Features
