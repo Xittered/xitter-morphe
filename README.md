@@ -6,12 +6,22 @@ client of a [Xitter](https://github.com/Xittered/xitter) instance.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-<!-- Generated on release from patches-list.json; edits between these markers are replaced. -->
+> **[v1.0.0](https://github.com/jakeayy/xitter-morphe/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
+<details open>
+<summary>📦 X&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
 
-| Patch | What it does | Options |
-| --- | --- | --- |
-| **Xitter** | Sends every X address (x.com, twitter.com, twimg.com, t.co, pscp.tv…) to the instance, translates X's OAuth signing into Xitter's session cookie + csrf header, and answers the app's sign-in screens with the instance's own sign-in. | `serverUrl` (required), `clientToken`, `blockThirdParty` (default on), `allowedHosts` |
-| **Change package name** | Renames the package, its providers, permissions and account type so the app installs next to the real X. | `packageName` (default `com.twitter.android.xitter`), `appName` (default `Xitter`) |
+**🎯 Supported versions:**
+
+| 12.19.1-release.0 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Change package name](#change-package-name) | Changes the app's package name, account type and name, so the patched app installs next to the original X app instead of replacing it. Do not also select Morphe's own "Change package name" patch. | • Package name<br>• App name |
+| [Xitter](#xitter) | Makes the app a client of a Xitter instance. Every address of X (x.com, twitter.com, twimg.com, t.co...) is sent to the instance instead, signed in with the instance's sessions, and the app's sign-in screens sign in to the instance. Nothing is sent to X. | • Instance address<br>• Client app token<br>• Block third-party services<br>• Allowed hosts |
+
+</details>
 
 <!-- PATCHES_END -->
 
