@@ -150,6 +150,9 @@ final class XitterInterceptor implements Interceptor {
      * session the token stands for (its session cookie and csrf header).
      */
     static final class Auth implements Interceptor {
+        /** The session of the account the app last made a request for (ProfileFlags). */
+        static volatile Session lastSession;
+
         @Override
         public Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
@@ -168,6 +171,7 @@ final class XitterInterceptor implements Interceptor {
             out.removeHeader("x-csrf-token");
             Session s = Session.fromAuthorization(authorization);
             if (s != null) {
+                lastSession = s;
                 out.header("Cookie", "auth_token=" + s.authToken + "; ct0=" + s.csrf);
                 out.header("x-csrf-token", s.csrf);
                 out.header("x-twitter-auth-type", "OAuth2Session");

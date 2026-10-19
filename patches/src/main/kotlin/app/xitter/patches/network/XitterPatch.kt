@@ -226,6 +226,35 @@ val xitterPatch = bytecodePatch(
         }
         println("Xitter: error reporter " + if (hooked > 0) "hooked ($hooked entry points)" else "not found, not hooked")
 
+        // The instance's pride flag picker in Edit profile (ProfileFlags), added once the
+        // screen has found its fields: at the end of its constructor, which gets the activity.
+        val editProfile = mutableClassDefByOrNull("Lcom/twitter/app/profiles/edit/editprofile/h0;")
+        // the activity parameter: its class is obfuscated, so it is the one that is an Activity
+        fun isActivity(type: String): Boolean {
+            var t: String? = type
+            var depth = 0
+            while (t != null && depth++ < 20) {
+                if (t == "Landroid/app/Activity;" || t == "Landroidx/fragment/app/FragmentActivity;" || t == "Landroidx/appcompat/app/AppCompatActivity;") return true
+                t = classDefByOrNull(t)?.superclass
+            }
+            return false
+        }
+        val editInit = editProfile?.methods?.firstOrNull { m -> m.name == "<init>" && m.parameterTypes.any { isActivity(it.toString()) } }
+        if (editInit == null) {
+            println("Xitter: Edit profile not found, no flag picker")
+        } else {
+            val params = editInit.parameterTypes.map { it.toString() }
+            val index = params.indexOfFirst { isActivity(it) }
+            // the parameter's register: after "this", wide (J, D) parameters take two
+            val register = 1 + params.take(index).sumOf { if (it == "J" || it == "D") 2 else 1 }
+            val returns = editInit.implementation!!.instructions.withIndex()
+                .filter { it.value.opcode == Opcode.RETURN_VOID }.map { it.index }.reversed()
+            for (at in returns) {
+                editInit.addInstruction(at, "invoke-static/range {p$register .. p$register}, ${EXTENSION_PACKAGE}ProfileFlags;->attach(Landroid/app/Activity;)V")
+            }
+            println("Xitter: flag picker added to Edit profile (${returns.size})")
+        }
+
         // 4. Everything else that opens connections or resolves hosts.
         redirectPlatformCalls()
     }
