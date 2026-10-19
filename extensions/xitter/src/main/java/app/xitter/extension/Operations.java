@@ -53,6 +53,9 @@ final class Operations {
         op("BookmarkAdd", new Op("CreateBookmark", null, null));
         op("BookmarkDelete", new Op("DeleteBookmark", null, null));
 
+        // Explore: one timeline, inline in the page
+        op("Explore", new Op("ExplorePage", "explore_page.body", "explore_page.pageBody"));
+
         // lists
         op("ViewerListManagementTimeline", new Op("ListsManagementPageTimeline", "viewer.list_management_timeline.timeline", "viewer.timeline_response.timeline"));
         op("ListByIdQuery", new Op("ListByRestId", null, null, "rest_id", "listId"));
@@ -144,6 +147,10 @@ final class Operations {
             if (!(result instanceof JSONObject) || !((JSONObject) result).has(k)) return response;
             result = ((JSONObject) result).get(k);
         }
+        // the app's Explore page body names its timeline; the web's has no id
+        if ("Explore".equals(operation) && result instanceof JSONObject && !((JSONObject) result).has("id")) {
+            ((JSONObject) result).put("id", "explore");
+        }
         JSONObject moved = new JSONObject(), at = moved;
         for (int i = 0; i < op.to.length - 1; i++) {
             JSONObject next = new JSONObject();
@@ -151,6 +158,7 @@ final class Operations {
             at = next;
         }
         at.put(op.to[op.to.length - 1], result);
+        if ("Explore".equals(operation)) moved.getJSONObject("explore_page").put("id", "explore");
         response.put("data", moved);
         return response;
     }

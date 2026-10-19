@@ -15,7 +15,7 @@ import java.util.Iterator;
  *   client's instructions name their type in "type" and have no "__typename".
  * - Some timeline fields have other names: an item's "itemContent" is "content", a timeline
  *   tweet's "tweet_results" is "tweetResult", a timeline user's "user_results" is "userResult",
- *   a list's owner ("user_results") is "ownerResult".
+ *   a list's owner ("user_results") is "ownerResult", a trend's "trend_url" is "url".
  * - Users are read only from their "legacy" record; the web shape keeps names, avatar and counts
  *   in "core", "avatar", "relationship_counts" and so on.
  */
@@ -77,6 +77,7 @@ final class Shapes {
         if ("TimelineTweet".equals(typename) && key.equals("tweet_results")) return "tweetResult";
         if ("TimelineUser".equals(typename) && key.equals("user_results")) return "userResult";
         if ("List".equals(typename) && key.equals("user_results")) return "ownerResult";
+        if ("TimelineTrend".equals(typename) && key.equals("trend_url")) return "url";
         return key;
     }
 
