@@ -23,7 +23,24 @@ final class Shapes {
     private Shapes() {}
 
     /** `operation`: the app's GraphQL operation, whose result goes where it reads it */
+    /**
+     * Chat (XChat): the instance answers these in the app's own Apollo shape already; reshaping
+     * them for the classic screens (a classic "legacy" on every user) breaks them.
+     */
+    private static final java.util.Set<String> CHAT = new java.util.HashSet<>(java.util.Arrays.asList(
+            "AcceptMessageRequestMutation", "AddEncryptedConversationKeysMutation", "AddGroupMembersMutation",
+            "AddXChatPublicKeyMutation", "ArchiveConversationMutation", "ConversationDeleteMutation",
+            "CreateGroupConversationMutation", "DeleteXChatPublicKeyMutation", "EditGroupConversationMutation",
+            "GenerateXChatTokenMutation", "GetConversationEntryDetailsQuery", "GetConversationPageQuery",
+            "GetInboxPageConversationDataQuery", "GetInboxPageRequestQuery", "GetInitialXChatPageQuery",
+            "GetMessageEventsBySequenceIdQuery", "GetMessageEventsPageQuery", "GetMessageRequestsPageQuery",
+            "GetPublicKeysQuery", "GetUsersByIdsForXChat", "GetUsersByScreenNameForXChat",
+            "InitializeGroupConversationMutation", "MuteConversationMutation", "RemoveFromGroupMutation",
+            "SendMessageCreateMutation", "SendMessageEventMutation", "TypeaheadXChatQuery",
+            "UnarchiveConversationMutation", "UnmuteConversationMutation"));
+
     static String reshape(String operation, String json) throws JSONException {
+        if (operation != null && CHAT.contains(operation)) return json;
         Object root = walk(new org.json.JSONTokener(json).nextValue());
         if (root instanceof JSONObject) root = Operations.moveResult(operation, (JSONObject) root);
         return String.valueOf(root);

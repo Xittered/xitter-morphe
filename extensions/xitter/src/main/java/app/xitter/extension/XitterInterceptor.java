@@ -113,6 +113,10 @@ final class XitterInterceptor implements Interceptor {
         String json = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         // a repost: the app stores it, so it gets the repost itself (Reposts)
         if (response.isSuccessful() && Reposts.handles(operation)) json = Reposts.complete(chain, request, target, json);
+        // chat key backup: the app only trusts X's own realm addresses; the instance's realm is
+        // named as one of them, and requests to it come back to the instance (XitterNetwork.mapPath)
+        XitterNetwork.Instance instance = XitterNetwork.instance();
+        json = json.replace(instance.origin + instance.base + "/juicebox/", XitterNetwork.PINNED_REALM);
         try {
             json = Shapes.reshape(operation, json);
         } catch (Exception e) {

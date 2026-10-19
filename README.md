@@ -93,11 +93,13 @@ Tested on a device against an unmodified Xitter server: sign-in, home (For you, 
 profiles (posts, replies, media, likes, followers, following), editing your profile, follow and
 unfollow, post detail, posting and replies, photo posts, reposts and quotes, likes, bookmarks,
 notifications, search (top, latest, people, media), Explore (trends), lists, communities
-(explore, community pages, join and leave), blocked and muted accounts, muted words, settings
+(explore, community pages, join and leave), chat (end-to-end encrypted, with passcode backup on
+the instance's Juicebox realm; messages go both ways live with the web client), blocked and
+muted accounts, muted words, settings
 pages X shows as web pages (they open the instance's, signed in), links (in-app or to the
 instance; X pages are never loaded).
 
-Not working yet: chat (needs the instance's Juicebox realm; untested), push notifications (they
+Not working yet: voice and video calls (the instance doesn't offer them), push notifications (they
 need Google's push service, which the patches block). Accounts with two-factor sign-in can't sign
 in from the app.
 

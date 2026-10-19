@@ -112,6 +112,9 @@ public final class XitterNetwork {
     }
 
     /** The path an X address has on the instance (the instance serves X's paths from its root). */
+    /** One of the key backup realm addresses X's app trusts; requests to it go to the instance's realm. */
+    static final String PINNED_REALM = "https://realm-a.x.com/";
+
     static String mapPath(String host, String path) {
         if (path == null || path.isEmpty()) path = "/";
         host = host.toLowerCase(Locale.ROOT);
@@ -166,11 +169,23 @@ public final class XitterNetwork {
     // ---- java.net (the patch replaces the app's calls to these with the methods below) ----
 
     public static URLConnection openConnection(URL url) throws IOException {
-        return guard(url).openConnection();
+        URL to = guard(url);
+        return asRequested(url, to, to.openConnection());
     }
 
     public static URLConnection openConnection(URL url, Proxy proxy) throws IOException {
-        return guard(url).openConnection(proxy);
+        URL to = guard(url);
+        return asRequested(url, to, to.openConnection(proxy));
+    }
+
+    // an https address of X's on an http instance: callers that expect HTTPS (the chat key
+    // backup's client) get the plain connection as an HttpsURLConnection
+    private static URLConnection asRequested(URL requested, URL to, URLConnection connection) {
+        if ("https".equalsIgnoreCase(requested.getProtocol()) && "http".equalsIgnoreCase(to.getProtocol())
+                && connection instanceof java.net.HttpURLConnection) {
+            return new CleartextHttpsConnection((java.net.HttpURLConnection) connection);
+        }
+        return connection;
     }
 
     public static InputStream openStream(URL url) throws IOException {
