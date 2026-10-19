@@ -32,6 +32,7 @@ import org.w3c.dom.Element
 
 private const val OKHTTP_BUILDER = "Lokhttp3/OkHttpClient\$Builder;"
 private const val WEBVIEW = "Landroid/webkit/WebView;"
+private const val CONTEXT = "Landroid/content/Context;"
 
 
 /**
@@ -45,6 +46,8 @@ private class Redirect(
     val parameters: List<String>,
     val returnType: String,
     val static: Boolean,
+    /** the receiver's type in the replacement (subclasses are passed as it) */
+    val receiver: String? = null,
 ) {
     fun matches(ref: MethodReference) =
         ref.name == name && ref.returnType == returnType && ref.parameterTypes.map { it.toString() } == parameters &&
@@ -54,7 +57,7 @@ private class Redirect(
     fun replacement(ref: MethodReference) = ImmutableMethodReference(
         NETWORK_CLASS,
         name,
-        if (static) parameters else listOf(if (ref.definingClass == "Ljava/net/URL;") ref.definingClass else WEBVIEW) + parameters,
+        if (static) parameters else listOf(receiver ?: if (ref.definingClass == "Ljava/net/URL;") ref.definingClass else WEBVIEW) + parameters,
         returnType,
     )
 }
@@ -229,16 +232,28 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
     // WebView and the app's subclasses of it
     val superclasses = mutableMapOf<String, String?>()
     classDefForEach { superclasses[it.type] = it.superclass }
-    val webViews = HashMap<String, Boolean>()
-    fun isWebView(type: String): Boolean = webViews.getOrPut(type) {
+    // the framework's own classes aren't in the app; the Contexts the app derives from
+    superclasses.putAll(
+        mapOf(
+            "Landroid/app/Activity;" to "Landroid/view/ContextThemeWrapper;",
+            "Landroid/view/ContextThemeWrapper;" to "Landroid/content/ContextWrapper;",
+            "Landroid/app/Service;" to "Landroid/content/ContextWrapper;",
+            "Landroid/app/Application;" to "Landroid/content/ContextWrapper;",
+            "Landroid/content/ContextWrapper;" to CONTEXT,
+        ).filterKeys { it !in superclasses },
+    )
+    val subclassCache = HashMap<Pair<String, String>, Boolean>()
+    fun isSubclass(type: String, of: String): Boolean = subclassCache.getOrPut(type to of) {
         var t: String? = type
         var depth = 0
-        while (t != null && depth++ < 20) {
-            if (t == WEBVIEW) return@getOrPut true
+        while (t != null && depth++ < 30) {
+            if (t == of) return@getOrPut true
             t = superclasses[t]
         }
         false
     }
+    fun isWebView(type: String) = isSubclass(type, WEBVIEW)
+    fun isContext(type: String) = isSubclass(type, CONTEXT)
 
     val url: (String) -> Boolean = { it == "Ljava/net/URL;" }
     val inetAddress: (String) -> Boolean = { it == "Ljava/net/InetAddress;" }
@@ -251,6 +266,9 @@ private fun BytecodePatchContext.redirectPlatformCalls() {
         Redirect(::isWebView, "loadUrl", listOf("Ljava/lang/String;"), "V", static = false),
         Redirect(::isWebView, "loadUrl", listOf("Ljava/lang/String;", "Ljava/util/Map;"), "V", static = false),
         Redirect(::isWebView, "postUrl", listOf("Ljava/lang/String;", "[B"), "V", static = false),
+        // links handed to other apps
+        Redirect(::isContext, "startActivity", listOf("Landroid/content/Intent;"), "V", static = false, receiver = CONTEXT),
+        Redirect(::isContext, "startActivity", listOf("Landroid/content/Intent;", "Landroid/os/Bundle;"), "V", static = false, receiver = CONTEXT),
     )
     val invokes = setOf(
         Opcode.INVOKE_VIRTUAL, Opcode.INVOKE_VIRTUAL_RANGE, Opcode.INVOKE_STATIC, Opcode.INVOKE_STATIC_RANGE,

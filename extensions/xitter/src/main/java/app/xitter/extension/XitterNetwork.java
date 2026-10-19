@@ -244,6 +244,69 @@ public final class XitterNetwork {
         }
     }
 
+    // ---- links handed to other apps (the browser, Custom Tabs) ----
+
+    public static void startActivity(android.content.Context context, android.content.Intent intent) {
+        context.startActivity(outbound(context, intent));
+    }
+
+    public static void startActivity(android.content.Context context, android.content.Intent intent, android.os.Bundle options) {
+        context.startActivity(outbound(context, intent), options);
+    }
+
+    /**
+     * An intent opening an address of X's or of the instance: kept in the app when one of its
+     * screens takes it (a profile, a post, a hashtag; no network involved), otherwise an X
+     * address goes to the instance instead, so a browser never loads X. A share sheet's
+     * ("chooser") link is looked at too.
+     */
+    static android.content.Intent outbound(android.content.Context context, android.content.Intent intent) {
+        try {
+            if (intent == null) return null;
+            if (android.content.Intent.ACTION_CHOOSER.equals(intent.getAction())) {
+                android.content.Intent inner = intent.getParcelableExtra(android.content.Intent.EXTRA_INTENT);
+                if (inner == null) return intent;
+                android.content.Intent handled = outbound(context, inner);
+                // one of the app's own screens: no need to ask which app
+                if (context.getPackageName().equals(handled.getPackage())) return handled;
+                intent.putExtra(android.content.Intent.EXTRA_INTENT, handled);
+                return intent;
+            }
+            android.net.Uri data = intent.getData();
+            String scheme = data == null ? null : data.getScheme();
+            if (scheme == null || !(scheme.equals("http") || scheme.equals("https"))) return intent;
+            String host = data.getHost();
+            boolean x = isXHost(host), ours = isInstanceHost(host);
+            if (!x && !ours) return intent;
+            String own = context.getPackageName();
+            boolean targeted = intent.getPackage() != null || intent.getComponent() != null;
+            boolean toUs = own.equals(intent.getPackage()) || (intent.getComponent() != null && own.equals(intent.getComponent().getPackageName()));
+            if (toUs) return intent;
+            if (!targeted) {
+                // the app's screens take x.com addresses; the instance's are the same paths
+                android.net.Uri asX = ours ? android.net.Uri.parse("https://x.com" + instancePath(data)) : data;
+                android.content.Intent inApp = new android.content.Intent(intent).setData(asX).setPackage(own);
+                if (inApp.resolveActivity(context.getPackageManager()) != null) return inApp;
+            }
+            if (x) {
+                String to = rewrite(data.toString());
+                if (to != null) intent.setData(android.net.Uri.parse(to));
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not check an outgoing link", e);
+        }
+        return intent;
+    }
+
+    // an instance address's path (and query) as X has it: without the path the instance lives under
+    private static String instancePath(android.net.Uri uri) {
+        String path = uri.getEncodedPath() == null ? "/" : uri.getEncodedPath();
+        String base = instance().base;
+        if (!base.isEmpty() && path.startsWith(base)) path = path.substring(base.length());
+        if (path.isEmpty()) path = "/";
+        return path + (uri.getEncodedQuery() == null ? "" : "?" + uri.getEncodedQuery());
+    }
+
     // ---- OkHttp ----
 
     /** Called at the start of every OkHttpClient.Builder.build() in the app. */
